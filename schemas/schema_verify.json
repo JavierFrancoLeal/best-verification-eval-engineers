@@ -1,0 +1,418 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governance.post-ai-sdlc.dev/schemas/verification-eval/verify.v1.2.0.json",
+  "title": "VERIFY.md Module Judgment Frontmatter Schema",
+  "description": "Draft 2020-12 schema validating YAML frontmatter of lazy-loaded module VERIFY.md files in best-verification-eval-engineers (suite_id: verification-eval, ECOSYSTEM_CONTRACT v1.2.0).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "module_id",
+    "suite_id",
+    "owner_role",
+    "clean_room_auditor",
+    "deterministic_rules",
+    "semantic_invariants",
+    "calibration_contract",
+    "authoritative_sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.2.0",
+      "description": "Pinned ECOSYSTEM_CONTRACT / VERIFY.md schema version."
+    },
+    "module_id": {
+      "type": "string",
+      "enum": [
+        "test-execution-oracles",
+        "assertion-mutation-strength",
+        "determinism-flakiness-isolation",
+        "property-metamorphic-invariants",
+        "contract-boundary-regressions",
+        "llm-rag-evalops-calibration",
+        "anti-tampering-eval-governance"
+      ]
+    },
+    "suite_id": {
+      "type": "string",
+      "const": "verification-eval"
+    },
+    "owner_role": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100
+    },
+    "clean_room_auditor": {
+      "type": "string",
+      "enum": [
+        "auditor-test-integrity",
+        "auditor-evalops-validity"
+      ]
+    },
+    "deterministic_rules": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/DeterministicRule"
+      }
+    },
+    "semantic_invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/SemanticInvariant"
+      }
+    },
+    "calibration_contract": {
+      "$ref": "#/$defs/CalibrationContract"
+    },
+    "authoritative_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/AuthoritativeSource"
+      }
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "BLOCKER",
+        "MAJOR",
+        "MINOR"
+      ]
+    },
+    "DeterministicRule": {
+      "type": "object",
+      "required": [
+        "rule_id",
+        "canonical_id",
+        "engine",
+        "engine_rule_ref",
+        "severity",
+        "evidence_tier",
+        "source_id",
+        "languages",
+        "predicate"
+      ],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^VER-[A-Z]{3,5}-[A-Z0-9_]{3,20}-[0-9]{3}$"
+        },
+        "canonical_id": {
+          "type": "string",
+          "pattern": "^verification-eval:[a-z0-9-]+:VER-[A-Z]{3,5}-[A-Z0-9_]{3,20}-[0-9]{3}$"
+        },
+        "engine": {
+          "type": "string",
+          "enum": [
+            "verify_cpu_scanner",
+            "eval_ingest",
+            "pytest",
+            "vitest",
+            "jest",
+            "node_test",
+            "go_test",
+            "coverage_py",
+            "c8_v8",
+            "lcov",
+            "mutmut",
+            "stryker",
+            "cosmic_ray",
+            "gremlins",
+            "hypothesis",
+            "fast_check"
+          ]
+        },
+        "engine_rule_ref": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "evidence_tier": {
+          "type": "string",
+          "const": "TOOL_VERIFIED"
+        },
+        "source_id": {
+          "type": "string",
+          "pattern": "^SRC-[A-Z0-9_-]{2,40}$"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "python",
+              "javascript",
+              "typescript",
+              "go",
+              "yaml",
+              "json",
+              "toml",
+              "markdown",
+              "any"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "predicate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 400
+        },
+        "false_positive_exemption": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 240
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "engine": {
+                "const": "verify_cpu_scanner"
+              }
+            },
+            "required": [
+              "engine"
+            ]
+          },
+          "then": {
+            "properties": {
+              "engine_rule_ref": {
+                "pattern": "^VER-[A-Z]{3,5}-[A-Z0-9_]{3,20}-[0-9]{3}$"
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "SemanticInvariant": {
+      "type": "object",
+      "required": [
+        "invariant_id",
+        "canonical_id",
+        "auditor",
+        "severity",
+        "evidence_tier",
+        "statement",
+        "failure_signals",
+        "why_not_tier_a",
+        "source_id"
+      ],
+      "properties": {
+        "invariant_id": {
+          "type": "string",
+          "pattern": "^(INV-[A-Z0-9_-]{3,40}|VER-SEM-[A-Z0-9_]{3,24}-[0-9]{3})$"
+        },
+        "canonical_id": {
+          "type": "string",
+          "pattern": "^verification-eval:auditor-(test-integrity|evalops-validity):(testint|evalops)-0[1-7]$"
+        },
+        "auditor": {
+          "type": "string",
+          "enum": [
+            "auditor-test-integrity",
+            "auditor-evalops-validity"
+          ]
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "evidence_tier": {
+          "type": "string",
+          "const": "STATIC_LLM_INFERRED"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 500
+        },
+        "failure_signals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "why_not_tier_a": {
+          "type": "string",
+          "minLength": 15
+        },
+        "source_id": {
+          "type": "string",
+          "pattern": "^SRC-[A-Z0-9_-]{2,40}$"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "CalibrationContract": {
+      "type": "object",
+      "required": [
+        "layer_1_synthetic_fixture_regression_floor",
+        "layer_2_calibrated_holdout_eval"
+      ],
+      "properties": {
+        "layer_1_synthetic_fixture_regression_floor": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "min_positive_fixtures",
+            "min_negative_fixtures",
+            "production_claim_prohibited"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "min_positive_fixtures": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "min_negative_fixtures": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "min_deterministic_recall": {
+              "type": "number",
+              "minimum": 0.9,
+              "maximum": 1.0
+            },
+            "max_deterministic_fpr": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 0.05
+            },
+            "production_claim_prohibited": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "unevaluatedProperties": false
+        },
+        "layer_2_calibrated_holdout_eval": {
+          "type": "object",
+          "required": [
+            "required",
+            "estimator",
+            "confidence_level"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "estimator": {
+              "type": "string",
+              "enum": [
+                "rogan_gladen_lang_reiczigel",
+                "rogan_gladen_fieller",
+                "wilson_score_only"
+              ]
+            },
+            "confidence_level": {
+              "type": "number",
+              "const": 0.95
+            },
+            "min_holdout_per_class": {
+              "type": "integer",
+              "minimum": 100
+            },
+            "min_youden_j": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 1.0
+            },
+            "max_ci_half_width": {
+              "type": "number",
+              "exclusiveMinimum": 0.0,
+              "maximum": 0.15
+            },
+            "holdout_leakage_prohibited": {
+              "type": "boolean",
+              "const": true
+            },
+            "requires_human_signoff_on_holdout_change": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "required": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "required"
+                ]
+              },
+              "then": {
+                "required": [
+                  "min_holdout_per_class",
+                  "min_youden_j",
+                  "holdout_leakage_prohibited",
+                  "requires_human_signoff_on_holdout_change"
+                ]
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "AuthoritativeSource": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "title",
+        "citation_type",
+        "identifier"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^SRC-[A-Z0-9_-]{2,40}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5
+        },
+        "citation_type": {
+          "type": "string",
+          "enum": [
+            "STANDARD",
+            "PEER_REVIEWED_PAPER",
+            "OFFICIAL_DOCS",
+            "RFC_SPEC",
+            "BOOK",
+            "UNVERIFIED_SOURCE"
+          ]
+        },
+        "identifier": {
+          "type": "string",
+          "pattern": "^(https://|doi:10\\.|ISO/|NIST |OASIS |ISBN |UNVERIFIED_SOURCE)"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 1920,
+          "maximum": 2030
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

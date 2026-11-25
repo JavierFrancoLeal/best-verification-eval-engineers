@@ -1,0 +1,31 @@
+{
+  "skill_name": "determinism-flakiness-isolation",
+  "schema_version": "1.2.0",
+  "suite_id": "verification-eval",
+  "evals": [
+    {
+      "id": "determinism-flakiness-isolation-tp-01",
+      "category": "should_trigger",
+      "prompt": "Check this Vitest test that uses Math.random() and real setTimeout(250) without fake timers.",
+      "expected_output": {
+        "should_trigger": true,
+        "module_id": "determinism-flakiness-isolation",
+        "expected_canonical_ids": [
+          "verification-eval:determinism-flakiness-isolation:VER-FLK-NONDET-001"
+        ],
+        "expected_severity": "MAJOR"
+      }
+    },
+    {
+      "id": "determinism-flakiness-isolation-tn-01",
+      "category": "near_miss",
+      "prompt": "Update README.md typography and fix a CSS button hover color contrast issue.",
+      "expected_output": {
+        "should_trigger": false,
+        "module_id": "determinism-flakiness-isolation",
+        "expected_canonical_ids": [],
+        "expected_severity": null
+      }
+    }
+  ]
+}

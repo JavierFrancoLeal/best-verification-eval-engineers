@@ -1,0 +1,33 @@
+{
+  "skill_name": "llm-rag-evalops-calibration",
+  "schema_version": "1.2.0",
+  "suite_id": "verification-eval",
+  "evals": [
+    {
+      "id": "llm-rag-evalops-calibration-tp-01",
+      "category": "should_trigger",
+      "prompt": "Audit our prompt-tuning eval script that reports 99% production accuracy on 5 examples with same-model LLM judging.",
+      "expected_output": {
+        "should_trigger": true,
+        "module_id": "llm-rag-evalops-calibration",
+        "expected_canonical_ids": [
+          "verification-eval:llm-rag-evalops-calibration:VER-EVAL-UNCAL-001",
+          "verification-eval:auditor-evalops-validity:evalops-01",
+          "verification-eval:auditor-evalops-validity:evalops-02"
+        ],
+        "expected_severity": "BLOCKER"
+      }
+    },
+    {
+      "id": "llm-rag-evalops-calibration-tn-01",
+      "category": "near_miss",
+      "prompt": "Update README.md typography and fix a CSS button hover color contrast issue.",
+      "expected_output": {
+        "should_trigger": false,
+        "module_id": "llm-rag-evalops-calibration",
+        "expected_canonical_ids": [],
+        "expected_severity": null
+      }
+    }
+  ]
+}

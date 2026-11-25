@@ -1,0 +1,364 @@
+schema_version: "1.2.0"
+suite_id: "verification-eval"
+module_id: "auditor-test-integrity"
+clean_room_required: true
+synthesis_mode: "conjunctive_gate"
+cpu_precondition:
+  required_scanners:
+    - "ruff (rules: PT, B011, BLE001)"
+    - "eslint (plugins: eslint-plugin-jest, eslint-plugin-vitest)"
+    - "semgrep (test-hygiene & security-audit packs)"
+    - "codeql (static dataflow baseline)"
+    - "ci-test-execution-integrity (executed_assertions > 0, no silent collect-only/skip-all exit 0)"
+  fail_closed_blocking_id: "verification-eval:auditor-test-integrity:cpu-precondition-missing"
+  non_ast_filter: >-
+    Exclude syntactic defects deterministic CPU scanners already catch (literal assert False,
+    unmatched pytest.raises(Exception), literal .only/.skip tokens, syntax errors, unused imports).
+    Escalate strictly cross-file semantic oracle defects, diff-delta assertion weakening,
+    mock-boundary severance, mutation-blindness, transitive nondeterminism, and tampering.
+
+rules:
+  - id: "testint-01"
+    canonical_id: "verification-eval:auditor-test-integrity:testint-01"
+    name: "Tautological Tests Mirroring Implementation Bugs"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "jeff-offutt"
+    invariant_id: "INV-OFFUTT-01"
+    source_id: "AMMANN_OFFUTT_2017"
+    applies_to:
+      - "**/*test*.*"
+      - "**/*spec*.*"
+      - "**/tests/**"
+      - "**/__tests__/**"
+    non_cpu_rationale: >-
+      AST linters confirm only that an assertion node exists; they cannot determine cross-file
+      semantic equivalence between a test's expected-value computation and the SUT's implementation
+      formula, nor verify whether a single bug in a shared helper or mirrored expression causes
+      both SUT and test expectation to drift together (violating RIPR Revealability).
+    diff_inspection_protocol: >-
+      1. Read every newly added or modified test function in the diff.
+      2. Trace how the expected value in each assertion is constructed (inline math, imported SUT
+         helper, snapshot captured from the same PR's SUT output, or comparing sut(x) == sut(x)).
+      3. Read the corresponding SUT implementation file via Grep/Read and check whether mutating
+         a core arithmetic, relational, or business-rule operator in the SUT would alter the test's
+         expected value identically or leave the assertion passing.
+      4. Flag as BLOCKER when the expected value is not anchored to an independent specification
+         constant, independent reference model, or algebraic inverse property.
+    false_positive_exemption: >-
+      Exempt legitimate algebraic/metamorphic self-consistency properties (e.g., decode(encode(x)) == x,
+      idempotence f(f(x)) == f(x), or differential testing against an independent legacy oracle)
+      where the invariant holds independently of the SUT's internal implementation formula.
+    negative_control: >-
+      A pricing test asserting `calculate_total(price=100.00, coupon_pct=20, is_member=True) == 76.00`
+      using a spec-derived literal `76.00` rather than recomputing `100.00 * (100 - 20) / 100 * 0.95`
+      or calling `compute_discount_rate()` from the SUT module.
+    required_evidence: >-
+      Exact file paths and line ranges for both the test assertion computing the mirrored/shared
+      expectation and the corresponding SUT expression, plus one concrete fault in the SUT that
+      the tautological test would still pass.
+    mandatory_remediation: >-
+      Replace implementation-mirrored expected expressions with independent specification-derived
+      expected values, an independent reference oracle, or non-circular behavioral/algebraic
+      properties that fail when the SUT expression is mutated.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "testint-02"
+    canonical_id: "verification-eval:auditor-test-integrity:testint-02"
+    name: "Mock-Verifies-Mock Theater Severing SUT Infection and Propagation"
+    severity: "MAJOR"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "jeff-offutt"
+    invariant_id: "INV-OFFUTT-02"
+    source_id: "OFFUTT_TOSEM_1992"
+    applies_to:
+      - "**/*test*.*"
+      - "**/*spec*.*"
+      - "**/tests/**"
+      - "**/__tests__/**"
+    non_cpu_rationale: >-
+      Static analyzers cannot distinguish isolating a genuine external I/O boundary (HTTP client,
+      clock, third-party gateway) from mocking out the SUT's own internal methods or collaborators
+      such that assertions verify only mock call choreography (`assert_called_once`) while never
+      observing real state infection or output propagation.
+    diff_inspection_protocol: >-
+      1. Identify all test doubles (`patch`, `MagicMock`, `jest.mock`, `vi.spyOn`, `Mockito`,
+         custom stubs) added or modified in the test diff.
+      2. Read the target SUT function and map which internal branches, validations, or state
+         mutations are bypassed by the active mocks.
+      3. Check whether assertions inspect real SUT return values or persisted state transitions,
+         or solely assert that mock A invoked mock B with stubbed return values.
+      4. Flag when mocks stub the core changed behavior or when zero assertions observe real
+         propagated output/state from the changed SUT code.
+    false_positive_exemption: >-
+      Exempt pure orchestration/adapter tests whose sole responsibility is protocol dispatch to an
+      external I/O boundary, provided the test asserts exact serialized payloads, headers, retry
+      contracts, or error-mapping behavior on real boundary inputs and sibling tests cover core logic.
+    negative_control: >-
+      A test for an order-processing service that stubs only the external payment HTTP transport
+      boundary with realistic success/decline responses and asserts on real order state machine
+      transitions, ledger entries, and idempotency keys produced by the unmocked SUT.
+    required_evidence: >-
+      Test file path and line range showing mock setup and assertions, paired with SUT file path
+      and line range showing which changed logic is bypassed or unobserved by the assertions.
+    mandatory_remediation: >-
+      Move test doubles strictly to external I/O boundaries, execute the real SUT logic unmocked,
+      and assert on observable return values, state transitions, or serialized boundary contracts
+      rather than internal mock call choreography.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "testint-03"
+    canonical_id: "verification-eval:auditor-test-integrity:testint-03"
+    name: "Missing Negative, Adversarial, or Boundary Cases on Security and State-Machine Diffs"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "john-hughes"
+    invariant_id: "INV-HUGHES-01"
+    source_id: "HUGHES_LNCS_2016"
+    applies_to:
+      - "**/*test*.*"
+      - "**/*spec*.*"
+      - "**/tests/**"
+      - "**/__tests__/**"
+      - "**/*auth*.*"
+      - "**/*perm*.*"
+      - "**/*policy*.*"
+      - "**/*state*.*"
+      - "**/*parser*.*"
+    non_cpu_rationale: >-
+      AST scanners cannot infer domain security invariants, state-transition graphs, or parser
+      boundary conditions from production diffs, nor verify whether accompanying tests cover
+      unauthorized actors, illegal transitions, empty/zero/max inputs, or multi-step sequences.
+    diff_inspection_protocol: >-
+      1. Inspect production diff hunks for authorization/authentication guards, input parsers,
+         rate/quota limits, cryptographic/token checks, or finite state-machine transitions.
+      2. Locate all tests exercising those changed symbols via Grep and Read.
+      3. Verify explicit coverage of (a) unauthorized/denied or malformed adversarial inputs,
+         (b) exact numeric/length boundary values (`0`, `min-1`, `min`, `max`, `max+1`, empty),
+         and (c) illegal or repeated/re-entrant state transitions (e.g., open->close->reopen,
+         duplicate commit, rollback after partial failure).
+      4. Flag as BLOCKER if security or stateful diffs ship with happy-path-only tests.
+    false_positive_exemption: >-
+      Exempt pure formatting, documentation, logging, or refactor-only diffs that do not alter
+      authorization predicates, validation boundaries, parser grammars, or state transition tables,
+      provided existing negative/adversarial tests already cover the unchanged contract.
+    negative_control: >-
+      A PR adding a role-based export endpoint or order-cancellation state transition that ships
+      tests for unauthenticated (401), cross-tenant forbidden (403), expired token, malformed ID,
+      already-terminal-state rejection, and post-rejection invariant preservation.
+    required_evidence: >-
+      Production diff hunk showing the new/modified security guard, parser, or state transition
+      alongside the covering test file excerpt demonstrating the absent negative, boundary, or
+      illegal-transition test cases.
+    mandatory_remediation: >-
+      Add explicit negative/adversarial tests (denial, malformed inputs, privilege boundaries),
+      exact boundary-value tests, and multi-step illegal-transition or property-based state-machine
+      tests covering every newly introduced security or stateful branch.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "testint-04"
+    canonical_id: "verification-eval:auditor-test-integrity:testint-04"
+    name: "Silent Assertion Weakening, Test Skipping, or Postcondition Relaxation in PR Diffs"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "bertrand-meyer"
+    invariant_id: "INV-MEYER-01"
+    source_id: "MEYER_OOSC2_1997"
+    applies_to:
+      - "**/*test*.*"
+      - "**/*spec*.*"
+      - "**/tests/**"
+      - "**/__tests__/**"
+      - "**/fixtures/**"
+      - "**/__snapshots__/**"
+    non_cpu_rationale: >-
+      AST linters analyze only the final file snapshot and cannot compute logical entailment across
+      git diff hunks to detect when an assertion was semantically relaxed (e.g., `== 2` -> `>= 0`,
+      exact equality -> substring/truthiness check, widened numeric epsilon, dropped exception-state
+      checks, or silently regenerated golden snapshots hiding a regression).
+    diff_inspection_protocol: >-
+      1. Inspect every removed (`-`) and modified (`+`) assertion, matcher, tolerance, schema check,
+         skip/xfail marker, or snapshot hunk in test and fixture files.
+      2. Test logical implication: does the new assertion strictly allow states the old assertion
+         rejected (e.g., `assert x == expected` -> `assert x is not None`, `assert count == 2` ->
+         `assert count >= 0`, removing an error-case assertion, or widening `atol`/`rtol`)?
+      3. Check whether an accompanying specification/ADR/contract document in the repo explicitly
+         authorizes the behavioral relaxation.
+      4. Flag as BLOCKER any undocumented assertion weakening, deleted regression test, or
+         unjustified snapshot overwrite.
+    false_positive_exemption: >-
+      Exempt assertion updates explicitly accompanied by a reviewed specification/contract change in
+      the same PR (e.g., updated API schema/OpenAPI spec or versioned requirement doc) or removal
+      of demonstrably brittle non-contractual checks (e.g., exact log-message whitespace) replaced
+      by an equivalent or stronger structured behavioral assertion.
+    negative_control: >-
+      A PR tightening an assertion from `assert len(errors) > 0` to
+      `assert errors == [ValidationError(code="INVALID_RANGE", field="coupon_pct")]`, or updating
+      a versioned spec document and corresponding contract test together with preserved boundary checks.
+    required_evidence: >-
+      Exact unified diff hunk (`-` removed lines and `+` added lines) showing the semantic
+      weakening of the assertion, tolerance, or snapshot, plus verification that no specification
+      artifact justifies the relaxation.
+    mandatory_remediation: >-
+      Restore the original or stronger postcondition assertion and fix the underlying SUT defect,
+      or—if the contract legitimately changed—update the authoritative specification artifact and
+      add explicit negative/boundary tests for the new contract.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "testint-05"
+    canonical_id: "verification-eval:auditor-test-integrity:testint-05"
+    name: "Hidden Nondeterminism and Flakiness Leaks"
+    severity: "MAJOR"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "will-wilson"
+    invariant_id: "INV-WILSON-01"
+    source_id: "ZHOU_WILSON_SIGMOD_2021"
+    applies_to:
+      - "**/*test*.*"
+      - "**/*spec*.*"
+      - "**/tests/**"
+      - "**/__tests__/**"
+      - "**/conftest.py"
+      - "**/jest.config.*"
+      - "**/vitest.config.*"
+    non_cpu_rationale: >-
+      Regex/AST rules catch direct `time.sleep()` calls yet miss semantic nondeterminism: transitive
+      wall-clock dependencies (`datetime.now()` inside tested helpers without clock injection),
+      unseeded PRNGs, assertions relying on hash-randomized `set`/`dict`/`HashMap` iteration order,
+      shared mutable module-level fixtures causing test-order coupling, and retry wrappers added to
+      mask concurrency races.
+    diff_inspection_protocol: >-
+      1. Inspect new/modified tests, fixtures, and test-runner configs for wall-clock reads,
+         unseeded random/UUID generators, `sleep`/fixed timeout polling, live network/port bindings,
+         and retry decorators (`@pytest.mark.flaky`, `jest.retryTimes`, CI rerun loops).
+      2. Read called SUT helpers to detect un-injected clock/RNG dependencies or unordered map/set
+         iteration whose order feeds directly into ordered list/string assertions.
+      3. Check fixture scopes (`session`/`module`/global singletons) for mutable state written by
+         one test without deterministic reset/isolation before subsequent tests.
+      4. Flag whenever test outcomes can vary across execution order, CPU load, timezone, or seed.
+    false_positive_exemption: >-
+      Exempt explicitly tagged live end-to-end/canary smoke suites isolated from deterministic
+      pre-merge unit/integration gates, or randomized property tests that log and accept an explicit
+      reproducible seed (e.g., Hypothesis database/seed or explicit `PRNG(seed)`).
+    negative_control: >-
+      An async/expiry test injecting a deterministic `FakeClock`, passing an explicit `seed=42`
+      to its PRNG, synchronizing on an explicit event/latch rather than `sleep()`, and comparing
+      unordered outputs via canonical sorting or set equality.
+    required_evidence: >-
+      File path and line range of the nondeterministic call, unordered assertion, shared mutable
+      fixture, or retry-masking annotation, plus concrete failure scenario (e.g., midnight rollover,
+      reversed test order, or CI CPU contention).
+    mandatory_remediation: >-
+      Inject virtual/fake clocks and explicitly seeded PRNGs, replace `sleep()` waits with
+      deterministic synchronization hooks, canonicalize unordered collection comparisons, isolate
+      per-test state, and remove retry wrappers masking real races.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "testint-06"
+    canonical_id: "verification-eval:auditor-test-integrity:testint-06"
+    name: "Coverage-Theater and Mutation-Blind Assertions on Critical Branching Logic"
+    severity: "MAJOR"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "jeff-offutt"
+    invariant_id: "INV-OFFUTT-03"
+    source_id: "OFFUTT_TOSEM_1996"
+    applies_to:
+      - "**/*test*.*"
+      - "**/*spec*.*"
+      - "**/tests/**"
+      - "**/__tests__/**"
+    non_cpu_rationale: >-
+      Line and branch coverage tools measure only Reachability, reporting 100% coverage even when
+      a test calls a function solely to verify it does not crash or chooses inputs far from
+      conditional boundaries (e.g., `age=30` covers `age >= 18` at 100% while letting `age > 18`
+      survive). Only semantic mutant-survival analysis identifies un-killed selective mutants.
+    diff_inspection_protocol: >-
+      1. Identify every modified conditional boundary (`<`, `<=`, `>`, `>=`), compound boolean
+         predicate (`&&`, `||`), arithmetic expression, or critical side-effecting statement
+         (persistence write, audit log, quota decrement) in production diff hunks.
+      2. Read the covering tests and perform manual selective-operator mutation analysis (relational
+         `ROR`, conditional/logical `COR`, arithmetic `AOR`, and statement deletion `STD`) on each
+         changed line.
+      3. Flag as MAJOR when a changed critical branch is executed by tests (high coverage) yet at
+         least one non-equivalent boundary, logical-operator, or side-effect-deletion mutant would
+         survive every existing assertion.
+    false_positive_exemption: >-
+      Exempt Google-style "arid nodes" whose mutations are semantically unproductive (debug/info
+      logging strings, memory pre-allocation hints such as `reserve()`, pure telemetry formatting)
+      and provably equivalent mutants.
+    negative_control: >-
+      For `return age >= 18`, tests asserting both `can_vote(18) is True` and `can_vote(17) is False`,
+      killing both relational boundary (`>=` -> `>`) and negation mutants; for a write path, tests
+      asserting the persisted record state after mutation rather than only HTTP 200 status.
+    required_evidence: >-
+      Exact production file/line of the critical predicate or side effect, the exact surviving
+      non-equivalent mutant (e.g., `>=` mutated to `>`), and the covering test excerpt proving all
+      current assertions still pass under that mutant.
+    mandatory_remediation: >-
+      Add boundary-exact and side-effect-observing test cases that strongly kill every non-equivalent
+      relational, logical, arithmetic, and statement-deletion mutant on the changed critical lines.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "testint-07"
+    canonical_id: "verification-eval:auditor-test-integrity:testint-07"
+    name: "Anti-Self-Auditing and Test-Tampering Separation of Powers Violation"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "bowen-baker"
+    invariant_id: "INV-BAKER-01"
+    source_id: "BAKER_OPENAI_2025 (UNVERIFIED_SOURCE)"
+    applies_to:
+      - "**/*test*.*"
+      - "**/*spec*.*"
+      - "**/tests/**"
+      - "**/__tests__/**"
+      - "**/Makefile"
+      - "**/.github/workflows/**"
+      - "**/pyproject.toml"
+      - "**/package.json"
+      - "**/pytest.ini"
+      - "**/tox.ini"
+    non_cpu_rationale: >-
+      Frontier coding agents can bypass read-only test locks via syntactically valid exploits
+      invisible to AST linters: modifying upstream helper functions so verification always returns
+      True, shadowing libraries with local stubs, adding input-specific lookup tables targeting
+      visible test inputs, overriding `__eq__`/comparators, injecting `sys.exit(0)`/`SkipTest`
+      outside test modules, or narrowing CI/Makefile test selectors (`-k`, `--deselect`, `--ignore`).
+    diff_inspection_protocol: >-
+      1. Scan the entire PR diff (production code, tests, build files, CI configs, conftest/setup
+         hooks) for Separation-of-Powers tampering indicators:
+         (a) `sys.exit(0)`, `os._exit(0)`, `process.exit(0)`, `pytest.exit(returncode=0)`, or
+             `SkipTest`/`unittest.SkipTest` invoked from non-test or conditional paths;
+         (b) CI workflow, `Makefile`, `pyproject.toml`, or `package.json` edits adding `--ignore`,
+             `--deselect`, `-k`, `testPathIgnorePatterns`, or narrowing the executed test target set;
+         (c) production code branching on test-fixture literal values (input special-casing / lookup
+             tables), inspecting stack frames/environment variables (`PYTEST_CURRENT_TEST`, `NODE_ENV == 'test'`)
+             to alter logic, or parsing test files at runtime;
+         (d) comparison-operator overrides (`__eq__`, `equals`) or monkey-patches weakening verifiers;
+         (e) simultaneous unapproved modification of protected test suites by an autonomous builder PR.
+      2. Flag immediately as BLOCKER upon any tampering mechanism.
+    false_positive_exemption: >-
+      Exempt legitimate CLI entrypoints (`if __name__ == "__main__": sys.exit(0)`) cleanly separated
+      from library/test execution, and authorized CI infrastructure PRs that modify test runners
+      without touching application business logic and retain >= 100% of prior test-suite scope.
+    negative_control: >-
+      A bug-fix PR that modifies only production source files to implement the general algorithm,
+      leaves existing regression tests and CI runner configurations untouched, and adds new
+      independent regression tests without hardcoding fixture values in production logic.
+    required_evidence: >-
+      Exact diff hunk across production, test, or CI files demonstrating the tampering vector
+      (narrowed selector, early exit, special-case branch, verifier monkey-patch, or unauthorized
+      oracle edit) and explaining how it bypasses genuine specification verification.
+    mandatory_remediation: >-
+      Revert all test/CI/verifier tampering and fixture special-casing; enforce host-level read-only
+      protection on existing tests and CI configs during agent execution; fix the underlying
+      implementation generally (or escalate a genuine specification conflict via a human-reviewed
+      ticket rather than mutating the oracle).
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"

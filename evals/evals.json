@@ -1,0 +1,120 @@
+{
+  "skill_name": "verification-director",
+  "schema_version": "1.2.0",
+  "suite_id": "verification-eval",
+  "evals": [
+    {
+      "id": "vd-pos-01",
+      "category": "should_trigger",
+      "prompt": "Audit this PR's pytest and Vitest suites plus GitHub Actions CI workflow for assertion-free tests, tautological expects, and continue-on-error bypasses before merge.",
+      "expected_output": {
+        "should_trigger": true,
+        "routed_modules": [
+          "assertion-mutation-strength",
+          "anti-tampering-eval-governance"
+        ],
+        "expected_canonical_ids": [
+          "verification-eval:assertion-mutation-strength:VER-TAU-NOASSERT-001",
+          "verification-eval:anti-tampering-eval-governance:VER-GOV-SKIP-001"
+        ],
+        "expected_severity": "BLOCKER"
+      }
+    },
+    {
+      "id": "vd-pos-02",
+      "category": "should_trigger",
+      "prompt": "Review our LLM-as-a-Judge evaluation script that tunes prompts on the reported eval set and claims 99% production accuracy from n=5 examples without Rogan-Gladen calibration.",
+      "expected_output": {
+        "should_trigger": true,
+        "routed_modules": [
+          "llm-rag-evalops-calibration"
+        ],
+        "expected_canonical_ids": [
+          "verification-eval:llm-rag-evalops-calibration:VER-EVAL-UNCAL-001",
+          "verification-eval:auditor-evalops-validity:evalops-01"
+        ],
+        "expected_severity": "BLOCKER"
+      }
+    },
+    {
+      "id": "vd-pos-03",
+      "category": "should_trigger",
+      "prompt": "Check why our CI passed green when pytest collected 0 tests and our Jest config zeroed coverageThreshold to 0.",
+      "expected_output": {
+        "should_trigger": true,
+        "routed_modules": [
+          "test-execution-oracles",
+          "anti-tampering-eval-governance"
+        ],
+        "expected_canonical_ids": [
+          "verification-eval:tooling:MISSING_REQUIRED_TOOL_EVIDENCE",
+          "verification-eval:anti-tampering-eval-governance:VER-GOV-TAMPER-001"
+        ],
+        "expected_severity": "BLOCKER"
+      }
+    },
+    {
+      "id": "vd-pos-04",
+      "category": "should_trigger",
+      "prompt": "Our Vitest retry scheduler tests flake in CI because they call Math.random() and real setTimeout sleeps without fake timers.",
+      "expected_output": {
+        "should_trigger": true,
+        "routed_modules": [
+          "determinism-flakiness-isolation"
+        ],
+        "expected_canonical_ids": [
+          "verification-eval:determinism-flakiness-isolation:VER-FLK-NONDET-001"
+        ],
+        "expected_severity": "MAJOR"
+      }
+    },
+    {
+      "id": "vd-neg-01",
+      "category": "near_miss",
+      "prompt": "Audit our checkout button contrast ratio, keyboard focus ring, and prefers-reduced-motion CSS transitions for WCAG 2.2 AA compliance.",
+      "expected_output": {
+        "should_trigger": false,
+        "handoff_suite_id": "ui-ux",
+        "routed_modules": [],
+        "expected_canonical_ids": [],
+        "expected_severity": null
+      }
+    },
+    {
+      "id": "vd-neg-02",
+      "category": "near_miss",
+      "prompt": "Run SAST and secret scanning to detect hardcoded AWS keys and SQL injection sinks in our Node.js API.",
+      "expected_output": {
+        "should_trigger": false,
+        "handoff_suite_id": "security-governance",
+        "routed_modules": [],
+        "expected_canonical_ids": [],
+        "expected_severity": null
+      }
+    },
+    {
+      "id": "vd-neg-03",
+      "category": "out_of_universe",
+      "prompt": "Configure PagerDuty on-call alerting SLOs and blue-green Kubernetes canary rollbacks in production.",
+      "expected_output": {
+        "should_trigger": false,
+        "out_of_scope_reason": "sre_observability_and_production_release_rollback",
+        "routed_modules": [],
+        "expected_canonical_ids": [],
+        "expected_severity": null
+      }
+    },
+    {
+      "id": "vd-neg-04",
+      "category": "near_miss",
+      "prompt": "Check whether our PostgreSQL migration drops a column with a table-locking ALTER TABLE in production.",
+      "expected_output": {
+        "should_trigger": false,
+        "handoff_suite_id": "systems-harness",
+        "routed_modules": [],
+        "expected_canonical_ids": [],
+        "expected_severity": null
+      }
+    }
+  ]
+}

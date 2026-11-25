@@ -1,0 +1,20 @@
+---
+description: Pre-merge verification and EvalOps governance director (ECOSYSTEM_CONTRACT v1.2.0, suite_id verification-eval).
+globs:
+  - "**/test_*.py"
+  - "**/*_test.py"
+  - "**/tests/**"
+  - "**/*.test.{js,jsx,ts,tsx}"
+  - "**/*.spec.{js,jsx,ts,tsx}"
+  - "**/*_test.go"
+  - "**/.github/workflows/*.{yml,yaml}"
+  - "**/evals/**"
+alwaysApply: false
+---
+
+# Verification & EvalOps Director (`verification-eval`)
+
+- Run `.cursor/skills/verification-director/tools/verify_cpu_scanner.py --target . --sarif-out verify_cpu_scanner.sarif` before semantic review.
+- Ingest JUnit XML, LCOV/coverage JSON, and mutation JSON via `.cursor/skills/verification-director/tools/eval_ingest.py` (fail-closed exit `3` when `tests_executed == 0`).
+- Escalate mock-heavy tests, missing negative auth regressions, holdout contamination, or uncalibrated LLM judges to read-only Clean-Room auditors (`auditor-test-integrity`, `auditor-evalops-validity`).
+- Emit `Verdict Envelope v1.2.0` (`BLOCKER >= 1 -> REJECT`, `MAJOR >= 1 -> ITERATE`, else `SHIP`).

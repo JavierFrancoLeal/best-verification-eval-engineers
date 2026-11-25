@@ -1,0 +1,40 @@
+name: Validate Repository
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install validation dependencies
+        run: python3 -m pip install --upgrade pip && pip install -r requirements-dev.txt
+
+      - name: Run immutable ECOSYSTEM_CONTRACT v1.2.0 core validator
+        run: python3 validators/ecosystem_core_validator.py
+
+      - name: Run verification-eval repository validator & live coexistence check
+        run: python3 validators/validate_repo.py
+
+      - name: Run 24-fixture two-layer benchmark
+        run: python3 tools/run_verify_benchmark.py
+
+      - name: Run targeted unit tests for CPU scanner and fail-closed ingestor
+        run: python3 -m unittest discover -s tests/unit -p "test_*.py" -v
+
+      - name: Verify installer syntax and dry-run modes
+        run: |
+          bash -n adapters/install.sh
+          bash adapters/install.sh --target all --mode director-only --scope workspace --dest /tmp/ci-verify-director --dry-run
+          bash adapters/install.sh --target all --mode full --scope workspace --dest /tmp/ci-verify-full --dry-run

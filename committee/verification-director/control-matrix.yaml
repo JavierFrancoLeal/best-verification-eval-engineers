@@ -1,0 +1,61 @@
+schema_version: "1.2.0"
+suite_id: "verification-eval"
+director_slug: "verification-director"
+synthesis_mode: "conjunctive_gate"
+
+modules:
+  - module_id: "test-execution-oracles"
+    brief: "modules/test-execution-oracles/BRIEF.md"
+    verify: "modules/test-execution-oracles/VERIFY.md"
+    triggers: ["junit.xml", "lcov.info", "coverage.json", "pytest", "vitest", "jest", "go test"]
+    auditor: "auditor-test-integrity"
+
+  - module_id: "assertion-mutation-strength"
+    brief: "modules/assertion-mutation-strength/BRIEF.md"
+    verify: "modules/assertion-mutation-strength/VERIFY.md"
+    triggers: ["test_*.py", "*.test.ts", "*.spec.ts", "*_test.go", "stryker", "mutmut", "gremlins"]
+    cpu_rules: ["VER-TAU-NOASSERT-001", "VER-TAU-CONST-001", "VER-TAU-SWALLOW-001"]
+    auditor: "auditor-test-integrity"
+
+  - module_id: "determinism-flakiness-isolation"
+    brief: "modules/determinism-flakiness-isolation/BRIEF.md"
+    verify: "modules/determinism-flakiness-isolation/VERIFY.md"
+    triggers: ["time.sleep", "setTimeout", "Math.random", "random.", "datetime.now", "useFakeTimers"]
+    cpu_rules: ["VER-FLK-NONDET-001"]
+    auditor: "auditor-test-integrity"
+
+  - module_id: "property-metamorphic-invariants"
+    brief: "modules/property-metamorphic-invariants/BRIEF.md"
+    verify: "modules/property-metamorphic-invariants/VERIFY.md"
+    triggers: ["hypothesis", "fast-check", "rapid", "metamorphic", "roundtrip", "idempotent"]
+    auditor: "auditor-evalops-validity"
+
+  - module_id: "contract-boundary-regressions"
+    brief: "modules/contract-boundary-regressions/BRIEF.md"
+    verify: "modules/contract-boundary-regressions/VERIFY.md"
+    triggers: ["openapi", "pact", "schema", "authz", "403", "boundary", "contract"]
+    auditor: "auditor-test-integrity"
+
+  - module_id: "llm-rag-evalops-calibration"
+    brief: "modules/llm-rag-evalops-calibration/BRIEF.md"
+    verify: "modules/llm-rag-evalops-calibration/VERIFY.md"
+    triggers: ["evals/", "judge", "holdout", "benchmark", "rag", "calibration", "rogan_gladen"]
+    cpu_rules: ["VER-EVAL-UNCAL-001"]
+    auditor: "auditor-evalops-validity"
+
+  - module_id: "anti-tampering-eval-governance"
+    brief: "modules/anti-tampering-eval-governance/BRIEF.md"
+    verify: "modules/anti-tampering-eval-governance/VERIFY.md"
+    triggers: [".github/workflows/", "pyproject.toml", "vitest.config", "jest.config", "AUDITOR.md", "skip"]
+    cpu_rules: ["VER-GOV-SKIP-001", "VER-GOV-TAMPER-001"]
+    auditor: "auditor-test-integrity"
+
+auditors:
+  - slug: "auditor-test-integrity"
+    path: "committee/auditors/auditor-test-integrity/AUDITOR.md"
+    rules: "committee/auditors/auditor-test-integrity/rules.yaml"
+    rule_ids: ["testint-01", "testint-02", "testint-03", "testint-04", "testint-05", "testint-06", "testint-07"]
+  - slug: "auditor-evalops-validity"
+    path: "committee/auditors/auditor-evalops-validity/AUDITOR.md"
+    rules: "committee/auditors/auditor-evalops-validity/rules.yaml"
+    rule_ids: ["evalops-01", "evalops-02", "evalops-03", "evalops-04", "evalops-05", "evalops-06", "evalops-07"]

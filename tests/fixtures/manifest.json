@@ -1,0 +1,320 @@
+{
+  "schema_version": "1.2.0",
+  "suite_id": "verification-eval",
+  "calibration_scope_label": "synthetic_fixture_regression_floor_not_universal_production_precision",
+  "fixtures": [
+    {
+      "fixture_id": "tp_01_assertion_free_test",
+      "path": "tests/fixtures/cpu/tp_01_assertion_free_test.py",
+      "layer": "layer1_cpu",
+      "module_id": "assertion-mutation-strength",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:assertion-mutation-strength:VER-TAU-NOASSERT-001"
+      ],
+      "expected_severity": "BLOCKER",
+      "rationale": "pytest functions invoke calculate_tiered_discount with zero assert or pytest.raises statements."
+    },
+    {
+      "fixture_id": "tp_02_tautological_constant_assert",
+      "path": "tests/fixtures/cpu/tp_02_tautological_constant_assert.py",
+      "layer": "layer1_cpu",
+      "module_id": "assertion-mutation-strength",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:assertion-mutation-strength:VER-TAU-CONST-001"
+      ],
+      "expected_severity": "BLOCKER",
+      "rationale": "pytest functions assert literal True, 1 == 1, and reflexive identity normalized == normalized."
+    },
+    {
+      "fixture_id": "tp_03_tautological_js_expect",
+      "path": "tests/fixtures/cpu/tp_03_tautological_js_expect.test.ts",
+      "layer": "layer1_cpu",
+      "module_id": "assertion-mutation-strength",
+      "language": "typescript",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:assertion-mutation-strength:VER-TAU-CONST-001",
+        "verification-eval:assertion-mutation-strength:VER-TAU-NOASSERT-001"
+      ],
+      "expected_severity": "BLOCKER",
+      "rationale": "Vitest suite combines expect(true).toBe(true) tautology with empty and assertion-free test() blocks."
+    },
+    {
+      "fixture_id": "tp_04_exception_swallowing_test",
+      "path": "tests/fixtures/cpu/tp_04_exception_swallowing_test.py",
+      "layer": "layer1_cpu",
+      "module_id": "assertion-mutation-strength",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:assertion-mutation-strength:VER-TAU-SWALLOW-001"
+      ],
+      "expected_severity": "BLOCKER",
+      "rationale": "pytest functions wrap calls and assertions in try/except Exception: pass and bare except: ... handlers."
+    },
+    {
+      "fixture_id": "tp_05_untracked_skip_bypass",
+      "path": "tests/fixtures/cpu/tp_05_untracked_skip_bypass.py",
+      "layer": "layer1_cpu",
+      "module_id": "anti-tampering-eval-governance",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:anti-tampering-eval-governance:VER-GOV-SKIP-001"
+      ],
+      "expected_severity": "MAJOR",
+      "rationale": "Contains bare @pytest.mark.skip, untracked reason without issue/expiry, and runtime pytest.skip()."
+    },
+    {
+      "fixture_id": "tp_06_ci_test_continue_on_error",
+      "path": "tests/fixtures/cpu/tp_06_ci_test_continue_on_error.yml",
+      "layer": "layer1_cpu",
+      "module_id": "anti-tampering-eval-governance",
+      "language": "yaml",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:anti-tampering-eval-governance:VER-GOV-SKIP-001"
+      ],
+      "expected_severity": "MAJOR",
+      "rationale": "GitHub Actions workflow sets continue-on-error: true on both pytest step and vitest eval job."
+    },
+    {
+      "fixture_id": "tp_07_flaky_sleep_and_unseeded_random",
+      "path": "tests/fixtures/cpu/tp_07_flaky_sleep_and_unseeded_random.test.ts",
+      "layer": "layer1_cpu",
+      "module_id": "determinism-flakiness-isolation",
+      "language": "typescript",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:determinism-flakiness-isolation:VER-FLK-NONDET-001"
+      ],
+      "expected_severity": "MAJOR",
+      "rationale": "Vitest unit tests use unseeded Math.random() and real wall-clock setTimeout sleeps without fake timers."
+    },
+    {
+      "fixture_id": "tp_08_coverage_threshold_weakened",
+      "path": "tests/fixtures/cpu/tp_08_coverage_threshold_weakened.json",
+      "layer": "layer1_cpu",
+      "module_id": "anti-tampering-eval-governance",
+      "language": "json",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:anti-tampering-eval-governance:VER-GOV-TAMPER-001"
+      ],
+      "expected_severity": "BLOCKER",
+      "rationale": "Quality-gate JSON sets Jest coverageThreshold metrics, coverage fail_under, and Stryker break to 0."
+    },
+    {
+      "fixture_id": "tp_09_write_enabled_cleanroom_auditor",
+      "path": "tests/fixtures/cpu/tp_09_write_enabled_cleanroom_auditor.md",
+      "layer": "layer1_cpu",
+      "module_id": "anti-tampering-eval-governance",
+      "language": "markdown",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:anti-tampering-eval-governance:VER-GOV-TAMPER-001"
+      ],
+      "expected_severity": "BLOCKER",
+      "rationale": "Clean-Room AUDITOR.md frontmatter grants forbidden Write and Edit tools in allowed-tools."
+    },
+    {
+      "fixture_id": "tp_10_uncalibrated_eval_overclaim",
+      "path": "tests/fixtures/cpu/tp_10_uncalibrated_eval_overclaim.py",
+      "layer": "layer1_cpu",
+      "module_id": "llm-rag-evalops-calibration",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:llm-rag-evalops-calibration:VER-EVAL-UNCAL-001"
+      ],
+      "expected_severity": "MAJOR",
+      "rationale": "Eval script claims 99% production accuracy from n=5 hardcoded examples with no holdout split or CI."
+    },
+    {
+      "fixture_id": "tn_01_strong_behavioral_test",
+      "path": "tests/fixtures/cpu/tn_01_strong_behavioral_test.py",
+      "layer": "layer1_cpu",
+      "module_id": "assertion-mutation-strength",
+      "language": "python",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "rationale": "Clean parameterized pytest behavioral checks with explicit assertions and pytest.raises error paths."
+    },
+    {
+      "fixture_id": "tn_02_seeded_property_test",
+      "path": "tests/fixtures/cpu/tn_02_seeded_property_test.py",
+      "layer": "layer1_cpu",
+      "module_id": "property-metamorphic-invariants",
+      "language": "python",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "rationale": "Deterministic seeded Hypothesis property-based test (derandomize=True) verifying round-trip invariant."
+    },
+    {
+      "fixture_id": "tn_03_fake_timers_vitest",
+      "path": "tests/fixtures/cpu/tn_03_fake_timers_vitest.test.ts",
+      "layer": "layer1_cpu",
+      "module_id": "determinism-flakiness-isolation",
+      "language": "typescript",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "rationale": "Clean Vitest suite using vi.useFakeTimers(), deterministic Mulberry32 PRNG, and real behavioral assertions."
+    },
+    {
+      "fixture_id": "tn_04_tracked_skip_with_issue",
+      "path": "tests/fixtures/cpu/tn_04_tracked_skip_with_issue.py",
+      "layer": "layer1_cpu",
+      "module_id": "anti-tampering-eval-governance",
+      "language": "python",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "rationale": "Skip carries issue reference (#1234) and ISO expiry (2026-12-31); non-test helper functions have no assertions."
+    },
+    {
+      "fixture_id": "tn_05_clean_ci_test_workflow",
+      "path": "tests/fixtures/cpu/tn_05_clean_ci_test_workflow.yml",
+      "layer": "layer1_cpu",
+      "module_id": "anti-tampering-eval-governance",
+      "language": "yaml",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "rationale": "Strict GitHub Actions CI enforcing pytest --cov-fail-under=85 and Vitest coverage thresholds without bypass."
+    },
+    {
+      "fixture_id": "tn_06_clean_readonly_auditor",
+      "path": "tests/fixtures/cpu/tn_06_clean_readonly_auditor.md",
+      "layer": "layer1_cpu",
+      "module_id": "anti-tampering-eval-governance",
+      "language": "markdown",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "rationale": "Compliant Clean-Room AUDITOR.md declaring strictly read-only allowed-tools [Read, Grep, Glob]."
+    },
+    {
+      "fixture_id": "sem_01_mock_verifies_mock",
+      "path": "tests/fixtures/semantic/sem_01_mock_verifies_mock.test.ts",
+      "layer": "layer2_semantic",
+      "module_id": "test-execution-oracles",
+      "auditor": "auditor-test-integrity",
+      "language": "typescript",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:auditor-test-integrity:testint-02"
+      ],
+      "expected_severity": "MAJOR",
+      "expected_ast_findings_count": 0,
+      "rationale": "Mocks both InvoiceRepository and BillingService.chargeSubscription itself, asserting mocked output."
+    },
+    {
+      "fixture_id": "sem_02_tautological_oracle_mirrors_bug",
+      "path": "tests/fixtures/semantic/sem_02_tautological_oracle_mirrors_bug.py",
+      "layer": "layer2_semantic",
+      "module_id": "assertion-mutation-strength",
+      "auditor": "auditor-test-integrity",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:auditor-test-integrity:testint-01"
+      ],
+      "expected_severity": "BLOCKER",
+      "expected_ast_findings_count": 0,
+      "rationale": "Test oracle copies the exact buggy production formula (days_in_cycle + 1 and inverted tax/discount order)."
+    },
+    {
+      "fixture_id": "sem_03_missing_negative_auth_regression",
+      "path": "tests/fixtures/semantic/sem_03_missing_negative_auth_regression.test.ts",
+      "layer": "layer2_semantic",
+      "module_id": "contract-boundary-regressions",
+      "auditor": "auditor-test-integrity",
+      "language": "typescript",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:auditor-test-integrity:testint-03"
+      ],
+      "expected_severity": "BLOCKER",
+      "expected_ast_findings_count": 0,
+      "rationale": "Tenant-scoped endpoint lacks tenant ownership check and omits 403 cross-tenant negative tests."
+    },
+    {
+      "fixture_id": "sem_04_eval_holdout_contamination",
+      "path": "tests/fixtures/semantic/sem_04_eval_holdout_contamination.py",
+      "layer": "layer2_semantic",
+      "module_id": "llm-rag-evalops-calibration",
+      "auditor": "auditor-evalops-validity",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:auditor-evalops-validity:evalops-01"
+      ],
+      "expected_severity": "BLOCKER",
+      "expected_ast_findings_count": 0,
+      "rationale": "Prompt-tuning selection loop optimizes directly on eval_cases and reports that same set as final benchmark."
+    },
+    {
+      "fixture_id": "sem_05_llm_judge_self_preference_bias",
+      "path": "tests/fixtures/semantic/sem_05_llm_judge_self_preference_bias.py",
+      "layer": "layer2_semantic",
+      "module_id": "llm-rag-evalops-calibration",
+      "auditor": "auditor-evalops-validity",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:auditor-evalops-validity:evalops-02"
+      ],
+      "expected_severity": "BLOCKER",
+      "expected_ast_findings_count": 0,
+      "rationale": "Same model family judges its own outputs in fixed Slot-A order without position swapping or human calibration."
+    },
+    {
+      "fixture_id": "sem_06_clean_metamorphic_and_holdout_eval",
+      "path": "tests/fixtures/semantic/sem_06_clean_metamorphic_and_holdout_eval.py",
+      "layer": "layer2_semantic",
+      "module_id": "llm-rag-evalops-calibration",
+      "auditor": "auditor-evalops-validity",
+      "language": "python",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "expected_ast_findings_count": 0,
+      "rationale": "Negative control demonstrating disjoint dev/holdout split, cross-family swapped judge, metamorphic check, Wilson CI, and Rogan-Gladen calibration."
+    },
+    {
+      "fixture_id": "sem_07_clean_behavioral_auth_and_oracle",
+      "path": "tests/fixtures/semantic/sem_07_clean_behavioral_auth_and_oracle.test.ts",
+      "layer": "layer2_semantic",
+      "module_id": "contract-boundary-regressions",
+      "auditor": "auditor-test-integrity",
+      "language": "typescript",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "expected_ast_findings_count": 0,
+      "rationale": "Negative control testing real handler against in-memory fake store, independent oracle, and explicit 401/403 cross-tenant rejections."
+    },
+    {
+      "fixture_id": "sem_08_unadjusted_noisy_judge_prevalence",
+      "path": "tests/fixtures/semantic/sem_08_unadjusted_noisy_judge_prevalence.py",
+      "layer": "layer2_semantic",
+      "module_id": "llm-rag-evalops-calibration",
+      "auditor": "auditor-evalops-validity",
+      "language": "python",
+      "should_trigger": true,
+      "expected_canonical_ids": [
+        "verification-eval:auditor-evalops-validity:evalops-03"
+      ],
+      "expected_severity": "BLOCKER",
+      "expected_ast_findings_count": 0,
+      "rationale": "Reports raw noisy-judge rate as true production prevalence despite Se=0.82, Sp=0.74 without Rogan-Gladen adjustment or calibration uncertainty."
+    }
+  ]
+}

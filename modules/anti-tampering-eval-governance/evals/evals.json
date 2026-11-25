@@ -1,0 +1,32 @@
+{
+  "skill_name": "anti-tampering-eval-governance",
+  "schema_version": "1.2.0",
+  "suite_id": "verification-eval",
+  "evals": [
+    {
+      "id": "anti-tampering-eval-governance-tp-01",
+      "category": "should_trigger",
+      "prompt": "Inspect this PR that sets continue-on-error: true in CI, zeroes Jest coverageThreshold, and adds Write to AUDITOR.md.",
+      "expected_output": {
+        "should_trigger": true,
+        "module_id": "anti-tampering-eval-governance",
+        "expected_canonical_ids": [
+          "verification-eval:anti-tampering-eval-governance:VER-GOV-SKIP-001",
+          "verification-eval:anti-tampering-eval-governance:VER-GOV-TAMPER-001"
+        ],
+        "expected_severity": "BLOCKER"
+      }
+    },
+    {
+      "id": "anti-tampering-eval-governance-tn-01",
+      "category": "near_miss",
+      "prompt": "Update README.md typography and fix a CSS button hover color contrast issue.",
+      "expected_output": {
+        "should_trigger": false,
+        "module_id": "anti-tampering-eval-governance",
+        "expected_canonical_ids": [],
+        "expected_severity": null
+      }
+    }
+  ]
+}

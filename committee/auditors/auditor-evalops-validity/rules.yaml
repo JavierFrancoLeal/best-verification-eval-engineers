@@ -1,0 +1,388 @@
+schema_version: "1.2.0"
+suite_id: "verification-eval"
+module_id: "auditor-evalops-validity"
+clean_room_required: true
+synthesis_mode: "conjunctive_gate"
+cpu_precondition:
+  required_scanners:
+    - "ruff (python eval harness lint & bugbear checks)"
+    - "semgrep (eval-config & data-pipeline hygiene)"
+    - "exact-split-overlap-checker (deterministic SHA-256 & 13-gram train/eval intersection == 0)"
+    - "eval-schema-validator (JSON/YAML dataset & rubric manifest validation)"
+  fail_closed_blocking_id: "verification-eval:auditor-evalops-validity:cpu-precondition-missing"
+  non_ast_filter: >-
+    Exclude syntactic YAML/JSON errors and verbatim SHA-256/n-gram duplicates already caught by
+    deterministic CPU checkers. Escalate strictly semantic/rephrased/retrieval leakage, judge
+    cognitive/family biases, missing human calibration & prevalence correction, direct reward
+    gaming/monitor obfuscation, missing metamorphic relations, finite-sample CI illusions, and
+    longitudinal harness/rubric drift.
+
+rules:
+  - id: "evalops-01"
+    canonical_id: "verification-eval:auditor-evalops-validity:evalops-01"
+    name: "Train, Dev, Test, or Holdout Contamination Including Rephrased and Retrieval Leakage"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "wei-lin-chiang"
+    invariant_id: "INV-CHIANG-02"
+    source_id: "YANG_CHIANG_2023"
+    applies_to:
+      - "**/*eval*.*"
+      - "**/*bench*.*"
+      - "**/*dataset*.*"
+      - "**/*split*.*"
+      - "**/*prompt*.*"
+      - "**/evals/**"
+      - "**/benchmarks/**"
+      - "**/datasets/**"
+    non_cpu_rationale: >-
+      Exact SHA-256 and 13-gram overlap scanners fail against rephrased questions, cross-language
+      code translations, entity-overlapping documents, few-shot prompt exemplars sampled from the
+      evaluation split, or RAG vector indexes ingesting the same QA pairs or source passages used
+      as holdout evaluation targets.
+    diff_inspection_protocol: >-
+      1. Trace all data-loading, splitting, few-shot exemplar selection, fine-tuning, and RAG
+         indexing paths across the diff and referenced configs via Read/Grep.
+      2. Verify strict disjointness at the entity/document/repository/temporal level (not only row
+         ID) between training/dev/few-shot/retrieval inputs and validation/holdout evaluation sets.
+      3. Inspect synthetic data generation or augmentation pipelines for LLM-rephrased or
+         translated variants derived from evaluation benchmarks.
+      4. Check whether static public benchmarks known to be saturated/contaminated are used as
+         sole capability gates without a fresh temporal or private holdout split.
+      5. Flag as BLOCKER whenever semantic, entity, few-shot, or retrieval-index leakage into the
+         holdout set is detected.
+    false_positive_exemption: >-
+      Exempt explicitly labeled synthetic canary/memorization probes intentionally injected to
+      measure leakage rate, or RAG corpora containing strictly public domain reference documents
+      when evaluation queries and gold answers are newly authored and strictly disjoint from the
+      index and few-shot prompts.
+    negative_control: >-
+      An eval pipeline enforcing entity-grouped and temporal cutoff splits (`train < T1 <= dev < T2 <= holdout`),
+      sourcing few-shot prompt examples strictly from `train`, running semantic/embedding
+      decontamination against `holdout`, and sealing `holdout` behind read-restricted CI storage.
+    required_evidence: >-
+      Exact file paths and line ranges showing the shared data source, overlapping entity/document
+      partition, few-shot exemplar draw from the eval split, or rephrasing pipeline reading eval
+      items into training/prompt artifacts.
+    mandatory_remediation: >-
+      Enforce entity-level and temporal split isolation, restrict few-shot exemplars and RAG
+      training/tuning data strictly to the train/dev partitions, run semantic decontamination
+      against the holdout split, and rotate/seal compromised static holdout sets.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "evalops-02"
+    canonical_id: "verification-eval:auditor-evalops-validity:evalops-02"
+    name: "Judge-Model Self-Preference, Position, or Verbosity and Style Bias"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "wei-lin-chiang"
+    invariant_id: "INV-CHIANG-01"
+    source_id: "ZHENG_CHIANG_NEURIPS_2023"
+    applies_to:
+      - "**/*judge*.*"
+      - "**/*grader*.*"
+      - "**/*eval*.*"
+      - "**/*rubric*.*"
+      - "**/*scorer*.*"
+      - "**/evals/**"
+      - "**/prompts/**"
+    non_cpu_rationale: >-
+      AST scanners cannot compare the semantic lineage of an evaluated model against a configured
+      judge model string, detect asymmetric single-order pairwise prompts susceptible to position
+      bias (up to 75% first-position bias), inspect natural-language rubrics for missing verbosity
+      controls, or check whether math/code judges omit CoT and reference-guided grading.
+    diff_inspection_protocol: >-
+      1. Read judge configuration files and prompt templates across the PR diff.
+      2. Compare the evaluated candidate model family/provider against the judge model family;
+         flag same-family judging used for comparative/promotion decisions without an independent
+         cross-family judge or balanced multi-family jury.
+      3. For pairwise comparison judges, verify two-game bidirectional position swapping (A/B and
+         B/A) with explicit tie/inconsistency handling rather than single-order prompting.
+      4. Inspect judge rubrics and aggregation code for verbosity/markdown style controls
+         (length-controlled scoring, binary pass/fail criteria, or explicit anti-padding rules).
+      5. For math, coding, or verifiable reasoning domains, verify CoT-before-verdict plus
+         reference-guided or deterministic execution grading rather than direct reference-free scoring.
+    false_positive_exemption: >-
+      Exempt deterministic code-execution/symbolic verifiers (exact AST/unit-test/regex/SQL checks)
+      that do not use an LLM judge, or preliminary single-model debugging scripts explicitly marked
+      non-gating and excluded from promotion/comparison reports.
+    negative_control: >-
+      A pairwise evaluation harness comparing Model A vs. Model B using a cross-family judge
+      ensemble, executing both `(A, B)` and `(B, A)` orderings (recording flipped verdicts as ties),
+      applying length/markdown style control in regression scoring, and supplying reference solutions
+      for quantitative tasks.
+    required_evidence: >-
+      Exact file paths and line ranges of the judge config and prompt template proving same-family
+      self-judging, missing position swap, uncontrolled verbosity/style bias, or ungrounded
+      reference-free math/code judging.
+    mandatory_remediation: >-
+      Route judging to a cross-family model or family-balanced jury, implement two-game A/B position
+      swapping with tie resolution on flips, add explicit conciseness/style controls (or binary
+      rubrics), and ground verifiable reasoning/math/code judgments with reference solutions or
+      deterministic verifiers.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "evalops-03"
+    canonical_id: "verification-eval:auditor-evalops-validity:evalops-03"
+    name: "Missing Human-Calibrated Gold Labels, Prevalence Adjustment, or Valid Confidence Intervals"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "ron-kohavi"
+    invariant_id: "INV-KOHAVI-02"
+    source_id: "KOHAVI_TANG_XU_2020"
+    applies_to:
+      - "**/*eval*.*"
+      - "**/*judge*.*"
+      - "**/*metric*.*"
+      - "**/*score*.*"
+      - "**/*report*.*"
+      - "**/evals/**"
+      - "**/benchmarks/**"
+    non_cpu_rationale: >-
+      Static analyzers cannot determine whether an evaluation aggregator treats raw noisy LLM-judge
+      outputs as unbiased ground-truth rates (ignoring sensitivity/specificity distortion that can
+      inflate rare rates 2.6x–3.7x), omits an independent human-annotated calibration slice, applies
+      dangerous shared calibration across different candidate models (`Delta J != 0`), or drops
+      confidence intervals altogether.
+    diff_inspection_protocol: >-
+      1. Read metric aggregation, reporting, and CI release-gate scripts in the diff.
+      2. Check whether raw LLM-judge pass/win rates are reported or gated directly without
+         referencing an expert human-labeled calibration slice.
+      3. Where bias correction is present, verify that sensitivity (`q1`), specificity (`q0`), and
+         Youden's `J = q0 + q1 - 1` are computed, that model comparisons use model-specific
+         calibration (or PPI++ / EIF estimation) rather than unvalidated shared Rogan-Gladen
+         calibration across candidate models, and that confidence intervals incorporate both test
+         and calibration uncertainty.
+      4. Flag as BLOCKER when an LLM-judge pipeline gates releases or publishes accuracy/win-rate
+         claims without human calibration, bias correction, and uncertainty bounds.
+    false_positive_exemption: >-
+      Exempt evaluations graded exclusively by exact deterministic ground-truth oracles (e.g.,
+      passing deterministic unit tests, exact schema/checksum matches) where judge misclassification
+      rate is identically zero (still subject to finite-sample CI rules under `evalops-06`).
+    negative_control: >-
+      An eval aggregator combining 150 expert human-labeled calibration items per evaluated model
+      with 1,500 LLM-judged items via power-tuned PPI++ (`ppi_py` or equivalent), reporting
+      `q1`, `q0`, Youden's `J`, `Delta J`, and 95% bootstrap/asymptotic confidence intervals.
+    required_evidence: >-
+      Exact file paths and line ranges of the raw-score aggregator or gate threshold showing
+      uncalibrated naive judge averaging without gold-label calibration, debiasing estimator, or
+      confidence-interval calculation.
+    mandatory_remediation: >-
+      Collect an independent domain-expert human calibration slice, measure judge sensitivity (`q1`),
+      specificity (`q0`), and Youden's `J` per evaluated model, apply a principled debiasing
+      estimator (PPI++ or model-specific Rogan-Gladen with `Delta J` diagnostic), and gate/report
+      calibrated 95% confidence intervals rather than raw naive judge averages.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "evalops-04"
+    canonical_id: "verification-eval:auditor-evalops-validity:evalops-04"
+    name: "Metric and Reward Gaming via Direct Optimization Against Evaluation Sets or Judges"
+    severity: "BLOCKER"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "bowen-baker"
+    invariant_id: "INV-BAKER-02"
+    source_id: "BAKER_OPENAI_2025 (UNVERIFIED_SOURCE)"
+    applies_to:
+      - "**/*optim*.*"
+      - "**/*tune*.*"
+      - "**/*train*.*"
+      - "**/*rl*.*"
+      - "**/*reward*.*"
+      - "**/*prompt*.*"
+      - "**/*eval*.*"
+      - "**/evals/**"
+      - "**/training/**"
+    non_cpu_rationale: >-
+      AST linters cannot trace semantic optimization loops—such as automated prompt search,
+      autonomous hill-climbing loops, checkpoint selection, or RL/GRPO reward functions—that
+      hill-climb directly on the holdout evaluation set, select the best of N private variants
+      without multiple-testing correction, or fold a safety/CoT monitor directly into strong
+      optimization penalties (inducing obfuscation).
+    diff_inspection_protocol: >-
+      1. Inspect prompt-optimization, hyperparameter-tuning, checkpoint-selection, and RL reward
+         scripts touched by the PR.
+      2. Trace the dataset path passed into the optimizer/selector objective and compare it against
+         the final reporting/gating evaluation dataset path.
+      3. Check for prompt rules or code heuristics overtly tailored to exploit judge quirks (e.g.,
+         padding verbosity, injecting rubric keywords, or hardcoding eval-prompt edge cases) or
+         direct optimization penalties on chain-of-thought/safety monitor outputs.
+      4. Flag as BLOCKER whenever the optimization loop reads the holdout set, cherry-picks the
+         max-scoring variant among many trials on the final eval set, or optimizes directly against
+         a release-gating monitor.
+    false_positive_exemption: >-
+      Exempt legitimate optimization strictly confined to a dedicated `train`/`dev` split when a
+      cryptographically or access-isolated `holdout` split is evaluated once post-selection and
+      safety/reasoning monitors are used strictly for offline diagnostics and release gating rather
+      than policy-gradient reward shaping.
+    negative_control: >-
+      A prompt-tuning pipeline optimizing exclusively on `dev_split.jsonl`, recording the number of
+      trials evaluated, freezing the chosen candidate, and running a single un-tuned final audit on
+      a separate read-restricted `holdout_split.jsonl` with decoupled monitoring.
+    required_evidence: >-
+      Exact file paths and line ranges showing the optimization/selection loop consuming the final
+      evaluation/holdout dataset, fitting judge-exploiting padding rules, or feeding a safety/CoT
+      monitor score directly into an RL/prompt optimization reward.
+    mandatory_remediation: >-
+      Separate `dev` optimization splits strictly from an untouched `holdout` gate set, remove
+      judge-gaming prompt hacks, decouple safety/CoT monitors from strong training/tuning rewards
+      to prevent obfuscation, and account for multi-checkpoint selection bias.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "evalops-05"
+    canonical_id: "verification-eval:auditor-evalops-validity:evalops-05"
+    name: "Metamorphic-Relation Violations and Untested Invariance on Non-Oracle Pipelines"
+    severity: "MAJOR"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "tsong-yueh-chen"
+    invariant_id: "INV-CHEN-01"
+    source_id: "XIE_CHEN_JSS_2011"
+    applies_to:
+      - "**/*eval*.*"
+      - "**/*rag*.*"
+      - "**/*retriev*.*"
+      - "**/*rank*.*"
+      - "**/*classif*.*"
+      - "**/*llm*.*"
+      - "**/evals/**"
+      - "**/tests/**"
+    non_cpu_rationale: >-
+      Deterministic scanners cannot determine whether an evaluation suite for a non-oracle ML, RAG,
+      search, or LLM pipeline checks only brittle exact-match snapshots or aggregate accuracy while
+      omitting paired source/follow-up Metamorphic Relations (such as context-order permutation
+      invariance, irrelevant-distractor invariance, monotonic filter narrowing, or paraphrase
+      consistency).
+    diff_inspection_protocol: >-
+      1. Identify PR diffs introducing or modifying non-oracle inference/scoring components (RAG
+         retrieval/reranking, classifiers, recommendation rankers, numerical analytics, or LLM
+         extraction/summarization pipelines).
+      2. Read the accompanying evaluation and test suites via Grep/Read.
+      3. Check whether at least two structurally distinct Metamorphic Relations (paired source and
+         transformed follow-up executions checking invariance, monotonicity, or symmetry) are
+         implemented and whether necessary verification MRs are separated from probabilistic
+         validation MRs.
+      4. Flag as MAJOR if the pipeline relies exclusively on single-point static examples or
+         aggregate benchmark accuracy with zero metamorphic perturbation checks.
+    false_positive_exemption: >-
+      Exempt deterministic symbolic pipelines possessing an exact closed-form oracle (e.g., exact
+      JSON schema parser or integer arithmetic engine) or pure UI/transport plumbing changes that
+      do not alter retrieval, ranking, prompting, feature transformation, or model inference logic.
+    negative_control: >-
+      A RAG retrieval/answering eval suite that tests both (a) context-chunk permutation invariance
+      and irrelevant-distractor invariance (source vs. follow-up faithfulness/answer consistency)
+      and (b) monotonic metadata-filter narrowing (`results(q AND filter) subset_of results(q)`).
+    required_evidence: >-
+      Production diff hunk showing modified non-oracle ML/RAG/LLM logic alongside the evaluation
+      suite files proving absence of paired source/follow-up metamorphic relation checks.
+    mandatory_remediation: >-
+      Add at least two diverse Metamorphic Relations tailored to the domain (e.g., input/document
+      permutation invariance + monotonic filter subsumption or paraphrase stability), clearly
+      separating hard necessary verification MRs from stochastic validation MRs.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "evalops-06"
+    canonical_id: "verification-eval:auditor-evalops-validity:evalops-06"
+    name: "Overclaiming Production Precision from Tiny Synthetic Smoke Sets and Point-Estimate Illusions"
+    severity: "MAJOR"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "ron-kohavi"
+    invariant_id: "INV-KOHAVI-01"
+    source_id: "KOHAVI_IJCAI_1995"
+    applies_to:
+      - "**/*eval*.*"
+      - "**/*bench*.*"
+      - "**/*metric*.*"
+      - "**/*gate*.*"
+      - "**/*report*.*"
+      - "**/evals/**"
+      - "**/benchmarks/**"
+    non_cpu_rationale: >-
+      Linters cannot evaluate statistical power, sample size `n`, clustering structure (multiple
+      questions per passage), or the semantic mismatch between a 10–30 item synthetic smoke fixture
+      (where 90% pass spans a 95% Wilson CI of 59.6%–98.2% at n=10 or 69.9%–97.2% at n=20) and a
+      production precision/promotion claim.
+    diff_inspection_protocol: >-
+      1. Inspect eval dataset sizes (`n`), fixture provenance (synthetic vs. real production traces),
+         and metric-reporting or CI promotion-threshold code in the diff.
+      2. Check whether promotion gates or model-comparison scripts assert superiority from bare
+         point estimates without Wilson/exact binomial CIs, paired-difference CIs (when comparing
+         models on identical items), or cluster-adjusted SEs (when multiple items share a passage).
+      3. Check whether a tiny synthetic smoke set (`n < 100` or synthetic-only cases) is configured
+         as a production-readiness or precision-certification gate rather than clearly labeled a
+         fast regression smoke floor.
+      4. Flag as MAJOR when bare point estimates or tiny synthetic sets are used to justify
+         production precision or comparative model-promotion claims.
+    false_positive_exemption: >-
+      Exempt fast pre-commit/PR smoke suites explicitly labeled as `SMOKE_REGRESSION_FLOOR`
+      (non-certifying sanity checks) when paired with a separate powered, real-distribution holdout
+      evaluation stage that reports exact `n` and valid 95% confidence intervals before release.
+    negative_control: >-
+      An eval gate clearly separating a 25-item `smoke_floor` check (catching hard regressions)
+      from a 500-item stratified production-trace holdout reporting paired model differences,
+      cluster-adjusted 95% CIs, and explicit Minimum Detectable Effect (MDE) power documentation.
+    required_evidence: >-
+      Exact file paths and line ranges of the tiny synthetic dataset manifest (`n`), bare point
+      estimate computation, and release/promotion gate or claim lacking confidence intervals and
+      statistical power justification.
+    mandatory_remediation: >-
+      Label tiny synthetic suites explicitly as non-certifying smoke floors, compute exact Wilson
+      or paired/cluster-adjusted 95% confidence intervals alongside `n`, and gate production
+      precision or model-comparison promotions exclusively on a statistically powered real-world
+      holdout evaluation set.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"
+
+  - id: "evalops-07"
+    canonical_id: "verification-eval:auditor-evalops-validity:evalops-07"
+    name: "Unpinned Eval Harness, Rubric, or Judge Drift Invalidating Longitudinal Comparisons"
+    severity: "MAJOR"
+    evidence_tier: "STATIC_LLM_INFERRED"
+    engineer_slug: "wei-lin-chiang"
+    invariant_id: "INV-CHIANG-03"
+    source_id: "LI_CHIANG_ICML_2025 (UNVERIFIED_SOURCE)"
+    applies_to:
+      - "**/*eval*.*"
+      - "**/*judge*.*"
+      - "**/*rubric*.*"
+      - "**/*harness*.*"
+      - "**/*config*.*"
+      - "**/evals/**"
+      - "**/benchmarks/**"
+    non_cpu_rationale: >-
+      Syntax checkers accept floating API model aliases (`gpt-4o`, `claude-sonnet-latest`),
+      unpinned temperatures/seeds, undocumented parser or tie-handling edits, and silent rubric
+      modifications—all of which induce hidden measurement drift (up to 20% prompt-level verdict
+      flips on unchanged runs or silent tie-rate shifts) that invalidates longitudinal comparisons.
+    diff_inspection_protocol: >-
+      1. Inspect eval harness configs, judge API invocations, response parsers, and rubric files.
+      2. Check for floating/unpinned judge or baseline model identifiers (missing dated snapshot
+         or immutable checkpoint hash), unpinned decoding settings (`temperature`, `top_p`, `max_tokens`),
+         or mutable remote prompt/rubric fetches without content-hash pinning.
+      3. Inspect diffs modifying scoring parsers, tie-handling logic (e.g., dropping ties vs.
+         counting ties as 0.5), or rubric wording WITHOUT bumping the benchmark/harness version
+         or re-evaluating the baseline anchor under the exact new harness.
+      4. Flag as MAJOR whenever unpinned judge/harness parameters or unversioned rubric/parser
+         changes corrupt apples-to-apples longitudinal comparisons.
+    false_positive_exemption: >-
+      Exempt exploratory ad-hoc notebook scripts outside CI/release pipelines, or deliberate eval
+      version upgrades (`eval_version: v1 -> v2`) that bump the harness version ID, re-run the
+      baseline anchor under identical pinned settings, and keep historical v1/v2 series separated.
+    negative_control: >-
+      An eval config pinning an immutable dated judge model ID, fixed `temperature: 0.0`,
+      SHA-256 content-hashed rubric and dataset manifests, explicit tie-handling formula, periodic
+      A/A repeat-run stability logging, and version-bumped re-baselining on any rubric change.
+    required_evidence: >-
+      Exact file paths and line ranges showing floating judge aliases, unpinned decoding/rubric
+      parameters, or unversioned parser/tie-handling/rubric edits applied without re-evaluating
+      the baseline under the modified harness.
+    mandatory_remediation: >-
+      Pin immutable dated judge model snapshots and decoding parameters, version-lock rubrics and
+      response parsers with content hashes, document explicit tie handling, run periodic unchanged
+      test-retest / A/A checks, and bump the eval harness version with full baseline re-scoring
+      whenever rubrics or parsers change.
+    cross_model_recommended: true
+    deduplication_key: "${canonical_id}:${file_path}:${symbol_or_test_name}"

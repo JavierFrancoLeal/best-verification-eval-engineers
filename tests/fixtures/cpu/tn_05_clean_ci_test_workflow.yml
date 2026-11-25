@@ -1,0 +1,32 @@
+name: Strict Verification CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Run pytest with strict coverage floor
+        run: pytest --cov=src --cov-branch --cov-fail-under=85
+
+  typescript-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run vitest with enforced thresholds
+        run: npx vitest run --coverage --coverage.thresholds.lines=85 --coverage.thresholds.branches=80

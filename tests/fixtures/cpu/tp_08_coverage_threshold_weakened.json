@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "jest": {
+    "collectCoverage": true,
+    "coverageThreshold": {
+      "global": {
+        "branches": 0,
+        "functions": 0,
+        "lines": 0,
+        "statements": 0
+      }
+    }
+  },
+  "coverage": {
+    "report": {
+      "fail_under": 0
+    }
+  },
+  "stryker": {
+    "testRunner": "vitest",
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 0
+    }
+  }
+}

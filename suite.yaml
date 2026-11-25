@@ -1,0 +1,63 @@
+ecosystem_contract_version: "1.2.0"
+suite_id: "verification-eval"
+repo_name: "best-verification-eval-engineers"
+director_slug: "verification-director"
+judgment_file: "VERIFY.md"
+schema_version: "1.2.0"
+synthesis_mode: "conjunctive_gate"
+score_heuristic: null
+clean_room_required: true
+sdlc_scope:
+  primary_artifacts:
+    - "**/test_*.py"
+    - "**/*_test.py"
+    - "**/tests/**/*.py"
+    - "**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs}"
+    - "**/*_test.go"
+    - "**/.github/workflows/*.{yml,yaml}"
+    - "**/pyproject.toml"
+    - "**/.coveragerc"
+    - "**/vitest.config.{js,ts}"
+    - "**/jest.config.{js,ts}"
+    - "**/stryker.conf*.json"
+    - "**/evals/**/*.{json,yaml,yml,py,ts}"
+  sdlc_stages: ["build", "verify"]
+  explicit_out_of_scope:
+    - "sre_observability"
+    - "production_release_rollback"
+    - "cloud_finops"
+    - "penetration_testing_and_sast_secret_scanning"
+    - "static_architecture_and_schema_migration_governance"
+    - "pre_implementation_requirements_and_product_specs"
+    - "ui_visual_design_and_wcag_ergonomics"
+execution_modes:
+  fast_pr_gate: "Run tools/verify_cpu_scanner.py (Tier A AST/config gate) + tools/eval_ingest.py (Tier B fail-closed JUnit/coverage/mutation/SARIF ingestor); enforce fail-closed exit 3 on missing or zero-test runner evidence."
+  architecture_review: "Run Tier A + Tier B deterministic CPU verification via tools/eval_ingest.py, activate applicable VERIFY.md functional control briefs via control-matrix.yaml, run Clean-Room cross-model auditors (auditor-test-integrity, auditor-evalops-validity) on semantic risk triggers, and emit Verdict Envelope v1.2.0."
+tooling:
+  pre_scanner: "tools/verify_cpu_scanner.py"
+  required_tools: ["pytest", "vitest", "coverage", "eval_ingest"]
+  optional_tools: ["mutmut", "stryker", "gremlins", "hypothesis", "fast-check", "gotestsum"]
+  accepted_formats: ["json", "sarif", "junit", "lcov", "exit_code"]
+  fail_closed_on_missing_required_tool: true
+roster_summary:
+  module_type: "functional_controls"
+  total_modules: 7
+  auditors: 2
+  regimes: 0
+domain_extensions:
+  - "gate_policy"
+  - "tests_executed"
+  - "line_coverage_pct"
+  - "branch_coverage_pct"
+  - "mutation_score_pct"
+  - "cross_model_auditor_verified"
+  - "human_signoff"
+handoff_targets:
+  - suite_id: "security-governance"
+    trigger_condition: "Verification audit detects hardcoded live credentials in test fixtures/cassettes, missing authorization boundary enforcement, or unredacted PII in eval datasets (security-governance holds Priority-1 precedence)."
+  - suite_id: "systems-harness"
+    trigger_condition: "Mutation or Clean-Room test integrity audit proves untestable tight coupling, circular module imports, or missing dependency injection preventing isolated verification."
+  - suite_id: "spec-context"
+    trigger_condition: "Test oracle cannot be independently derived because requirements, boundary conditions, or acceptance criteria are ambiguous or contradictory."
+  - suite_id: "ui-ux"
+    trigger_condition: "End-to-end or visual regression verification reveals broken user-facing interaction states, focus traps, or accessibility regressions."

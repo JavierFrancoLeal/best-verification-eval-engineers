@@ -1,0 +1,16 @@
+{
+  "name": "verification-director",
+  "suite_id": "verification-eval",
+  "version": "1.2.0",
+  "ecosystem_contract_version": "1.2.0",
+  "skill_entry": "SKILL.md",
+  "suite_manifest": "references/suite.yaml",
+  "control_matrix": "references/control-matrix.yaml",
+  "pre_scanner": "tools/verify_cpu_scanner.py",
+  "evidence_ingestor": "tools/eval_ingest.py",
+  "clean_room_required": true,
+  "auditors": [
+    "references/auditors/auditor-test-integrity/AUDITOR.md",
+    "references/auditors/auditor-evalops-validity/AUDITOR.md"
+  ]
+}
