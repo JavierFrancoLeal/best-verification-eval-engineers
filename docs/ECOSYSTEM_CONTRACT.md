@@ -1,4 +1,4 @@
-# ECOSYSTEM CONTRACT v1.2.0 — POST-AI PRE-MERGE CHANGE GOVERNANCE SUITES
+# ECOSYSTEM CONTRACT v1.3.0 — POST-AI PRE-MERGE CHANGE GOVERNANCE SUITES
 
 ## 1. Purpose, Scope & Explicit Non-Goals
 
@@ -89,6 +89,10 @@ Text-only LLM inspection of mechanical predicates exhibits unacceptable run-to-r
    - `UNVERIFIED_MISSING_TOOL`: Check could not execute because a required runtime, browser, telemetry source, or CLI scanner was absent.
 3. **Fail-Closed Gate for Deterministic Suites:** When `suite.yaml -> tooling.fail_closed_on_missing_required_tool` is `true` (mandatory for `verification-eval` and `security-governance`), missing required tool execution MUST prohibit `SHIP` (maximum verdict `ITERATE` with blocking ID `<suite_id>:tooling:MISSING_REQUIRED_TOOL_EVIDENCE`).
 4. **Tool Permissions (`allowed-tools`):** `SKILL.md` frontmatter explicitly permits the `agentskills.io` `allowed-tools` key so directors and modules can declare required CLI runners cleanly.
+5. **§4.4 Canonical Tier-A CPU Scanner CLI & JSON Envelope Contract (NEW in `v1.3.0`):** Every bundled `tools/*_cpu_scanner.py` MUST expose a uniform external interface so CI runners and multi-suite orchestrators can invoke any suite identically (domain-specific extras belong in optional flags or additive keys):
+   - **CLI Arguments:** Accept an optional positional target path **and** `--target` / `--root` aliases; `--format json|sarif` (suites may allow extra formats such as `markdown`); `--json-out` / `--json-output`; `--sarif-out` / `--sarif-output`.
+   - **Uniform Fail-Closed Exit Codes:** `0` (clean / MINOR-only), `1` (`MAJOR >= 1` and `BLOCKER == 0`), `2` (`BLOCKER >= 1`), `3` (missing target, invalid arguments, or tool error). Suites with advisory workflows may offer an explicit opt-out flag (`--no-fail-on-blocker`) but MUST default to fail-closed.
+   - **Top-Level JSON Envelope Keys:** Every Tier-A scanner JSON report MUST emit at top level: `schema_version`, `suite_id`, `scanner`, `scanner_version`, `evidence_tier` (`"TOOL_VERIFIED"`), `exit_code`, `duration_ms`, `files_scanned`, `files_skipped` (object with `total`, `oversized_count`, `binary_or_decode_count`, `os_error_count`, `python_syntax_error_count`), `counts` (`{blocker, major, minor}`), and flat `findings` (list). Backward-compatible domain keys (e.g., `results`, `total_blockers`, `scan_coverage`) may coexist alongside these canonical keys.
 
 ---
 

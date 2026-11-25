@@ -28,8 +28,21 @@ from typing import Any, Callable
 
 import yaml
 
-CORE_VALIDATOR_VERSION = "1.2.0"
-SUPPORTED_CONTRACT_VERSIONS = {"1.1.0", "1.2.0"}
+CORE_VALIDATOR_VERSION = "1.3.0"
+SUPPORTED_CONTRACT_VERSIONS = {"1.1.0", "1.2.0", "1.3.0"}
+TIER_A_REQUIRED_JSON_KEYS = (
+    "schema_version",
+    "suite_id",
+    "scanner",
+    "scanner_version",
+    "evidence_tier",
+    "exit_code",
+    "duration_ms",
+    "files_scanned",
+    "files_skipped",
+    "counts",
+    "findings",
+)
 ALLOWED_SYNTHESIS_MODES = {"conjunctive_gate", "weighted_panel"}
 ALLOWED_SEVERITIES = {"BLOCKER", "MAJOR", "MINOR"}
 LEGACY_EQUIVALENT_SEVERITIES = ALLOWED_SEVERITIES | {"hard_veto", "conditional_block"}
@@ -540,8 +553,103 @@ def check_multisuite_coexistence(
                 )
                 if hproc.returncode != 0:
                     errors.append(f"Coexistence FAIL: installed pre_scanner --help exited {hproc.returncode}: {hproc.stderr.strip()}")
-                elif scanner_smoke_fn is not None:
-                    errors.extend(scanner_smoke_fn(installed_scanner, dest))
+                else:
+                    # §4.4 Tier-A Scanner CLI & JSON Envelope Conformance Test (domain-neutral)
+                    empty_dir = dest / "_empty_conformance_probe"
+                    empty_dir.mkdir(exist_ok=True)
+                    probe_json = dest / "_probe_out.json"
+                    probe_sarif = dest / "_probe_out.sarif"
+                    tproc = subprocess.run(
+                        [
+                            sys.executable,
+                            str(installed_scanner),
+                            "--root",
+                            str(empty_dir),
+                            "--json-output",
+                            str(probe_json),
+                            "--sarif-output",
+                            str(probe_sarif),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if tproc.returncode != 0 or not probe_json.is_file() or not probe_sarif.is_file():
+                        errors.append(
+                            f"Tier-A Conformance FAIL (§4.4): --root/--json-output/--sarif-output exited {tproc.returncode}: {tproc.stderr.strip()}"
+                        )
+                    else:
+                        try:
+                            pdata = json.loads(probe_json.read_text(encoding="utf-8"))
+                            sdata = json.loads(probe_sarif.read_text(encoding="utf-8"))
+                            missing_keys = [k for k in TIER_A_REQUIRED_JSON_KEYS if k not in pdata]
+                            sk_keys = (
+                                "total",
+                                "oversized_count",
+                                "binary_or_decode_count",
+                                "os_error_count",
+                                "python_syntax_error_count",
+                            )
+                            if missing_keys:
+                                errors.append(f"Tier-A Conformance FAIL (§4.4): missing top-level JSON keys {missing_keys}")
+                            elif pdata.get("suite_id") != suite_id:
+                                errors.append(
+                                    f"Tier-A Conformance FAIL (§4.4): suite_id={pdata.get('suite_id')!r} != {suite_id!r}"
+                                )
+                            elif pdata.get("evidence_tier") != "TOOL_VERIFIED":
+                                errors.append(
+                                    f"Tier-A Conformance FAIL (§4.4): evidence_tier={pdata.get('evidence_tier')!r} != 'TOOL_VERIFIED'"
+                                )
+                            elif not isinstance(pdata.get("counts"), dict) or not all(
+                                k in pdata["counts"] for k in ("blocker", "major", "minor")
+                            ):
+                                errors.append("Tier-A Conformance FAIL (§4.4): counts must contain blocker/major/minor")
+                            elif not isinstance(pdata.get("files_skipped"), dict) or not all(
+                                k in pdata["files_skipped"] for k in sk_keys
+                            ):
+                                errors.append(f"Tier-A Conformance FAIL (§4.4): files_skipped must contain {list(sk_keys)}")
+                            elif not isinstance(pdata.get("findings"), list):
+                                errors.append("Tier-A Conformance FAIL (§4.4): findings must be a top-level list")
+                            elif sdata.get("version") != "2.1.0":
+                                errors.append(f"Tier-A Conformance FAIL (§4.4): SARIF version={sdata.get('version')!r} != '2.1.0'")
+                        except Exception as exc:
+                            errors.append(f"Tier-A Conformance FAIL (§4.4): invalid JSON/SARIF report ({exc})")
+
+                    # Also verify --target / --json-out / positional --format sarif + fail-closed exit 3 on missing target
+                    probe_json2 = dest / "_probe_out2.json"
+                    t2proc = subprocess.run(
+                        [sys.executable, str(installed_scanner), "--target", str(empty_dir), "--json-out", str(probe_json2)],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if t2proc.returncode != 0 or not probe_json2.is_file():
+                        errors.append(f"Tier-A Conformance FAIL (§4.4): --target/--json-out exited {t2proc.returncode}")
+
+                    pproc = subprocess.run(
+                        [sys.executable, str(installed_scanner), str(empty_dir), "--format", "sarif"],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if pproc.returncode != 0 or not pproc.stdout.strip():
+                        errors.append(
+                            f"Tier-A Conformance FAIL (§4.4): positional target --format sarif exited {pproc.returncode}: {pproc.stderr.strip()}"
+                        )
+
+                    mproc = subprocess.run(
+                        [sys.executable, str(installed_scanner), "--target", str(dest / "_missing_target_probe")],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if mproc.returncode != 3:
+                        errors.append(
+                            f"Tier-A Conformance FAIL (§4.4): missing target expected exit 3, got {mproc.returncode}"
+                        )
+
+                    if scanner_smoke_fn is not None:
+                        errors.extend(scanner_smoke_fn(installed_scanner, dest))
 
     return len(errors) == 0, errors
 

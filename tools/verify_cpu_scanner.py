@@ -1089,16 +1089,25 @@ def scan_repository(target: pathlib.Path, max_file_bytes: int = MAX_FILE_BYTES_D
         )
 
     elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+    files_skipped_dict = skipped.to_dict()
+    exit_code = 2 if counts["blocker"] > 0 else (1 if counts["major"] > 0 else 0)
     scan_coverage = {
         "total_candidate_files": files_scanned + skipped.total,
         "files_scanned": files_scanned,
-        "files_skipped": skipped.to_dict(),
+        "files_skipped": files_skipped_dict,
         "elapsed_ms": elapsed_ms,
     }
     return {
-        "scanner": SCANNER_NAME,
-        "version": SCANNER_VERSION,
+        "schema_version": "1.3.0",
         "suite_id": "verification-eval",
+        "scanner": SCANNER_NAME,
+        "scanner_version": SCANNER_VERSION,
+        "version": SCANNER_VERSION,
+        "evidence_tier": "TOOL_VERIFIED",
+        "exit_code": exit_code,
+        "duration_ms": elapsed_ms,
+        "files_scanned": files_scanned,
+        "files_skipped": files_skipped_dict,
         "counts": counts,
         "scan_coverage": scan_coverage,
         "findings": finding_dicts,
@@ -1164,7 +1173,7 @@ def to_sarif(report: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Tier A CPU verification pre-scanner (ECOSYSTEM_CONTRACT v1.2.0)")
+    parser = argparse.ArgumentParser(description="Tier A CPU verification pre-scanner (ECOSYSTEM_CONTRACT v1.3.0)")
     parser.add_argument("target_pos", nargs="?", type=pathlib.Path, default=None, help="File or repository root to scan")
     parser.add_argument("--target", "--root", dest="target_opt", type=pathlib.Path, default=None, help="File or repository root to scan")
     parser.add_argument("--format", choices=["json", "sarif"], default="json", help="Stdout output format when --json-out/--sarif-out omitted")
@@ -1173,12 +1182,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--max-file-bytes", type=int, default=MAX_FILE_BYTES_DEFAULT)
     args = parser.parse_args(argv)
 
-    target = args.target_opt or args.target_pos or pathlib.Path(".")
-    report = scan_repository(target.resolve(), max_file_bytes=args.max_file_bytes)
+    target = (args.target_opt or args.target_pos or pathlib.Path(".")).resolve()
+    if not target.exists():
+        print(json.dumps({"error": f"Target does not exist: {target}", "exit_code": 3}), file=sys.stderr)
+        return 3
+    report = scan_repository(target, max_file_bytes=args.max_file_bytes)
 
     if args.json_out:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
         args.json_out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if args.sarif_out:
+        args.sarif_out.parent.mkdir(parents=True, exist_ok=True)
         args.sarif_out.write_text(json.dumps(to_sarif(report), indent=2) + "\n", encoding="utf-8")
     if not args.json_out and not args.sarif_out:
         payload = to_sarif(report) if args.format == "sarif" else report
