@@ -443,11 +443,136 @@ def _lex_clike_tokens(src: str) -> List[Tuple[str, str, int]]:
     return tokens
 
 
+_JS_ASSERT_IDENTS = frozenset({"assert", "expect", "should", "fail"})
+_JS_TEARDOWN_IDENTS = frozenset(
+    {
+        "kill",
+        "rmSync",
+        "rmdirSync",
+        "unlinkSync",
+        "unlink",
+        "rm",
+        "close",
+        "destroy",
+        "disconnect",
+        "terminate",
+        "cleanup",
+        "abort",
+        "end",
+        "unref",
+        "clearTimeout",
+        "clearInterval",
+        "removeAllListeners",
+    }
+)
+_JS_POLL_PROBE_IDENTS = frozenset(
+    {
+        "fetch",
+        "request",
+        "connect",
+        "get",
+        "head",
+        "ping",
+        "health",
+        "ready",
+        "statSync",
+        "readFileSync",
+        "parse",
+    }
+)
+_JS_REAL_IO_RE = re.compile(
+    r"\b(?:spawn|execFile|createServer|fetch|http\.request|WebSocket|puppeteer|playwright|chromium)\b"
+)
+
+
+def _extract_try_body_before_catch(tokens: List[Tuple[str, str, int]], catch_idx: int) -> Tuple[int, List[Tuple[str, str, int]]]:
+    """Return (try_idx, body_tokens) for the try { ... } immediately preceding catch_idx, or (-1, [])."""
+    if catch_idx <= 0 or tokens[catch_idx - 1][1] != "}":
+        return -1, []
+    depth = 0
+    k = catch_idx - 1
+    body_start = -1
+    while k >= 0:
+        tval = tokens[k][1]
+        if tval == "}":
+            depth += 1
+        elif tval == "{":
+            depth -= 1
+            if depth == 0:
+                body_start = k
+                break
+        k -= 1
+    if body_start > 0 and tokens[body_start - 1][0] == "IDENT" and tokens[body_start - 1][1] == "try":
+        return body_start - 1, tokens[body_start + 1 : catch_idx - 1]
+    return -1, []
+
+
+_JS_UNIT_FRAMEWORK_RE = re.compile(
+    r"""(?:from\s+["'](?:vitest|jest|@jest/globals|mocha)["']|require\s*\(\s*["'](?:vitest|jest|mocha)["']|\bvi\.|\bjest\.)"""
+)
+
+
+def _enclosing_block_kind(tokens: List[Tuple[str, str, int]], pos: int) -> Optional[str]:
+    """Return 'finally', 'loop', or None for the innermost brace block structurally enclosing `pos`."""
+    depth = 0
+    k = pos - 1
+    while k >= 0:
+        tval = tokens[k][1]
+        if tval == "}":
+            depth += 1
+        elif tval == "{":
+            if depth == 0:
+                prev = k - 1
+                if prev >= 0 and tokens[prev][0] == "IDENT" and tokens[prev][1] == "finally":
+                    return "finally"
+                if prev >= 0 and tokens[prev][1] == ")":
+                    pdepth = 0
+                    m = prev
+                    while m >= 0:
+                        if tokens[m][1] == ")":
+                            pdepth += 1
+                        elif tokens[m][1] == "(":
+                            pdepth -= 1
+                            if pdepth == 0:
+                                if m > 0 and tokens[m - 1][0] == "IDENT" and tokens[m - 1][1] in ("while", "for"):
+                                    return "loop"
+                                break
+                        m -= 1
+                return None
+            depth -= 1
+        k -= 1
+    return None
+
+
+def _is_benign_js_empty_catch(tokens: List[Tuple[str, str, int]], catch_idx: int, close_brace_idx: int) -> bool:
+    """Return True only for empty catch {} structurally inside finally/teardown or a retry/polling loop (never around assertions)."""
+    try_idx, body = _extract_try_body_before_catch(tokens, catch_idx)
+    if try_idx < 0:
+        return False
+    body_idents = {val for kind, val, _ in body if kind == "IDENT"}
+    if body_idents & _JS_ASSERT_IDENTS:
+        return False
+    if body_idents & _JS_TEARDOWN_IDENTS:
+        return True
+    enclosing = _enclosing_block_kind(tokens, try_idx)
+    if enclosing == "finally":
+        return True
+    if enclosing == "loop":
+        suffix_end = min(len(tokens), close_brace_idx + 25)
+        suffix_idents = {val for kind, val, _ in tokens[close_brace_idx + 1 : suffix_end] if kind == "IDENT"}
+        has_poll_wait = bool(suffix_idents & {"setTimeout", "sleep", "delay", "wait"})
+        if has_poll_wait or bool(body_idents & _JS_POLL_PROBE_IDENTS):
+            return True
+    return False
+
+
 def scan_js_ts_test(source: str, rel_path: str) -> List[Finding]:
     tokens = _lex_clike_tokens(source)
-    has_fake_timers = any(t[1] == "useFakeTimers" for t in tokens)
-    findings: List[Finding] = []
     n = len(tokens)
+    has_fake_timers = any(t[1] == "useFakeTimers" for t in tokens)
+    has_unit_framework = bool(_JS_UNIT_FRAMEWORK_RE.search(source))
+    is_real_io_integration = (not has_unit_framework) and bool(_JS_REAL_IO_RE.search(source))
+    findings: List[Finding] = []
     i = 0
     while i < n:
         kind, val, line = tokens[i]
@@ -471,7 +596,7 @@ def scan_js_ts_test(source: str, rel_path: str) -> List[Finding]:
             findings.append(
                 Finding("VER-FLK-NONDET-001", rel_path, line, 1, "Unmocked Math.random() in JS/TS test.", "Math.random")
             )
-        if not has_fake_timers and kind == "IDENT" and val == "setTimeout" and i + 1 < n and tokens[i + 1][1] == "(":
+        if not has_fake_timers and not is_real_io_integration and kind == "IDENT" and val == "setTimeout" and i + 1 < n and tokens[i + 1][1] == "(":
             findings.append(
                 Finding("VER-FLK-NONDET-001", rel_path, line, 1, "Wall-clock setTimeout() without fake timers.", "setTimeout")
             )
@@ -508,9 +633,10 @@ def scan_js_ts_test(source: str, rel_path: str) -> List[Finding]:
                     j += 1
                 j += 1
             if j + 1 < n and tokens[j][1] == "{" and tokens[j + 1][1] == "}":
-                findings.append(
-                    Finding("VER-TAU-SWALLOW-001", rel_path, line, 1, "Empty catch {} block inside test.", "catch")
-                )
+                if not _is_benign_js_empty_catch(tokens, i, j + 1):
+                    findings.append(
+                        Finding("VER-TAU-SWALLOW-001", rel_path, line, 1, "Empty catch {} block inside test.", "catch")
+                    )
 
         if kind == "IDENT" and val in ("it", "test") and i + 1 < n and tokens[i + 1][1] == "(":
             j = i + 2
@@ -1042,8 +1168,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("target_pos", nargs="?", type=pathlib.Path, default=None, help="File or repository root to scan")
     parser.add_argument("--target", "--root", dest="target_opt", type=pathlib.Path, default=None, help="File or repository root to scan")
     parser.add_argument("--format", choices=["json", "sarif"], default="json", help="Stdout output format when --json-out/--sarif-out omitted")
-    parser.add_argument("--json-out", type=pathlib.Path, default=None)
-    parser.add_argument("--sarif-out", type=pathlib.Path, default=None)
+    parser.add_argument("--json-out", "--json-output", dest="json_out", type=pathlib.Path, default=None)
+    parser.add_argument("--sarif-out", "--sarif-output", dest="sarif_out", type=pathlib.Path, default=None)
     parser.add_argument("--max-file-bytes", type=int, default=MAX_FILE_BYTES_DEFAULT)
     args = parser.parse_args(argv)
 

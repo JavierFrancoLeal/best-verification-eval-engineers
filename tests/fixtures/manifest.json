@@ -201,6 +201,17 @@
       "rationale": "Compliant Clean-Room AUDITOR.md declaring strictly read-only allowed-tools [Read, Grep, Glob]."
     },
     {
+      "fixture_id": "tn_07_node_integration_polling_teardown",
+      "path": "tests/fixtures/cpu/tn_07_node_integration_polling_teardown.test.mjs",
+      "layer": "layer1_cpu",
+      "module_id": "determinism-flakiness-isolation",
+      "language": "javascript",
+      "should_trigger": false,
+      "expected_canonical_ids": [],
+      "expected_severity": null,
+      "rationale": "Node.js integration harness with real process spawn, bounded readiness polling, real assertions, and best-effort finally teardown must not false-positive."
+    },
+    {
       "fixture_id": "sem_01_mock_verifies_mock",
       "path": "tests/fixtures/semantic/sem_01_mock_verifies_mock.test.ts",
       "layer": "layer2_semantic",

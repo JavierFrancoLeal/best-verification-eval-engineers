@@ -330,6 +330,130 @@ class TestEvalIngestFailClosed(unittest.TestCase):
             )
             self.assertEqual(p_ok.returncode, 0)
 
+    def test_js_empty_catch_and_cli_aliases(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="verify-catch-") as tmp:
+            root = pathlib.Path(tmp)
+            # Swallowing an assertion inside catch {} MUST still fire BLOCKER VER-TAU-SWALLOW-001
+            (root / "bad_swallow.test.ts").write_text(
+                "test('swallows', () => { try { expect(1).toBe(2); } catch {} });\n"
+                "test('after_finally', () => { try { doWork(); } finally { done(); } try { doMoreWork(); } catch {} });\n"
+                "test('after_loop', () => { for (let i=0;i<3;i++){ f(i); } try { risky(); } catch {} await sleep(10); });\n",
+                encoding="utf-8",
+            )
+            json_out = root / "out.json"
+            sarif_out = root / "out.sarif"
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCANNER),
+                    "--root",
+                    str(root),
+                    "--json-output",
+                    str(json_out),
+                    "--sarif-output",
+                    str(sarif_out),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            self.assertEqual(proc.returncode, 2)
+            data = json.loads(json_out.read_text(encoding="utf-8"))
+            swallows = [
+                f for f in data["findings"]
+                if f["canonical_id"] == "verification-eval:assertion-mutation-strength:VER-TAU-SWALLOW-001"
+            ]
+            self.assertEqual(len(swallows), 3, f"Expected all 3 swallows to fire, got {swallows}")
+            self.assertEqual(json.loads(sarif_out.read_text(encoding="utf-8"))["version"], "2.1.0")
+
+    def test_eval_ingest_malformed_line_and_oversized_skip(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ingest-edge-") as tmp:
+            root = pathlib.Path(tmp)
+            sarif_p = root / "tier_a.sarif"
+            junit_p = root / "junit.xml"
+            junit_p.write_text(
+                '<testsuite tests="1" failures="0" errors="0"><testcase name="ok"/></testsuite>\n',
+                encoding="utf-8",
+            )
+            # 1. Oversized skipped file -> emits MAJOR TIER_A_INCOMPLETE_COVERAGE
+            sarif_p.write_text(
+                json.dumps(
+                    {
+                        "version": "2.1.0",
+                        "runs": [
+                            {
+                                "tool": {"driver": {"name": "verify_cpu_scanner", "version": "1.2.0", "rules": []}},
+                                "results": [],
+                                "properties": {
+                                    "scan_coverage": {
+                                        "total_candidate_files": 2,
+                                        "files_scanned": 1,
+                                        "files_skipped": {
+                                            "total": 1,
+                                            "oversized_count": 1,
+                                            "binary_or_decode_count": 0,
+                                            "os_error_count": 0,
+                                            "python_syntax_error_count": 0,
+                                        },
+                                    }
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            p_over = subprocess.run(
+                [sys.executable, str(INGEST), "--tier-a-sarif", str(sarif_p), "--junit", str(junit_p)],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            self.assertEqual(p_over.returncode, 1)
+            out_over = json.loads(p_over.stdout)
+            self.assertIn(
+                "verification-eval:anti-tampering-eval-governance:TIER_A_INCOMPLETE_COVERAGE",
+                out_over["blocking_ids"],
+            )
+
+            # 2. Malformed non-integer line in --semantic-findings -> clean exit 3 (never traceback)
+            self._write_clean_sarif(sarif_p)
+            sem_p = root / "bad_line.json"
+            sem_p.write_text(
+                json.dumps(
+                    {
+                        "auditor": "auditor-test-integrity",
+                        "read_only_attested": True,
+                        "findings": [
+                            {
+                                "canonical_id": "verification-eval:auditor-test-integrity:testint-01",
+                                "severity": "MAJOR",
+                                "file_path": "a.py",
+                                "line": "not-an-int",
+                                "message": "bad line",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            p_bad = subprocess.run(
+                [
+                    sys.executable,
+                    str(INGEST),
+                    "--tier-a-sarif",
+                    str(sarif_p),
+                    "--junit",
+                    str(junit_p),
+                    "--semantic-findings",
+                    str(sem_p),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            self.assertEqual(p_bad.returncode, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

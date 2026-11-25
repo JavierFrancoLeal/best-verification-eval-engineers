@@ -315,6 +315,14 @@ def parse_mutation_json(path: pathlib.Path) -> Dict[str, Any]:
     raise MissingOrInvalidEvidenceError("Unrecognized mutation testing JSON format.")
 
 
+def _parse_int_field(val: Any, label: str) -> int:
+    if isinstance(val, (bool, float)):
+        raise MissingOrInvalidEvidenceError(f"Malformed integer field '{label}': {val!r}")
+    if isinstance(val, int):
+        return val
+    raise MissingOrInvalidEvidenceError(f"Malformed integer field '{label}': {val!r}")
+
+
 def parse_tier_a_sarif(path: pathlib.Path) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     raw = _read_bounded_text(path, "verify_cpu_scanner.sarif")
     try:
@@ -342,7 +350,7 @@ def parse_tier_a_sarif(path: pathlib.Path) -> Tuple[List[Dict[str, Any]], Dict[s
                 "canonical_id": cid,
                 "severity": sev,
                 "file_path": loc.get("artifactLocation", {}).get("uri", ""),
-                "line": int(loc.get("region", {}).get("startLine", 0)),
+                "line": _parse_int_field(loc.get("region", {}).get("startLine", 0), "startLine"),
                 "message": res.get("message", {}).get("text", ""),
             }
         )
@@ -382,7 +390,7 @@ def parse_semantic_findings(path: pathlib.Path) -> List[Dict[str, Any]]:
                 "canonical_id": cid,
                 "severity": mapped_sev,
                 "file_path": str(item.get("file_path", "")),
-                "line": int(item.get("line", 0)),
+                "line": _parse_int_field(item.get("line", 0), "line"),
                 "message": str(item.get("message", "")),
             }
         )
@@ -537,7 +545,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             findings.extend(tier_a_findings)
             evidence["tier_a_scan_coverage"] = scan_cov
             sk = scan_cov["files_skipped"]
-            if sk.get("python_syntax_error_count", 0) > 0 or sk.get("os_error_count", 0) > 0:
+            if any(
+                sk.get(k, 0) > 0
+                for k in (
+                    "python_syntax_error_count",
+                    "os_error_count",
+                    "oversized_count",
+                    "binary_or_decode_count",
+                )
+            ):
                 findings.append(
                     {
                         "source": "tier_b",
@@ -545,7 +561,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "severity": "MAJOR",
                         "file_path": str(args.tier_a_sarif),
                         "line": 1,
-                        "message": f"Tier A skipped files due to syntax/OS errors: {sk}",
+                        "message": f"Tier A skipped candidate files (incomplete coverage): {sk}",
                     }
                 )
         except MissingOrInvalidEvidenceError as exc:
